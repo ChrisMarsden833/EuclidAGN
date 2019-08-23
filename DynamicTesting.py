@@ -17,7 +17,6 @@ import Corrfunc
 from Corrfunc.theory import wp
 from Corrfunc.theory import DD
 
-
 class EuclidMaster:
     """Class that encapsulates the Euclid code.
 
@@ -31,13 +30,20 @@ class EuclidMaster:
             colossus.cosmology, so define as approprate.
     """
 
-    def __init__(self, z, cosmo = 'planck18'):
+    def __init__(self, cosmo = 'planck18'):
         self.cosmology = cosmology.setCosmology(cosmo)
         # Extract Reduced Hubble Constant, because we use it so much
         self.h = self.cosmology.H0/100
         # Image and data file location
         self.visualValidatePath = "./visualValidation/"
         self.dataPath = "./Data/"
+        self.bigData = "./BigData/"
+
+        self.XLF_plottingData = []
+        self.Edd_plottingData = []
+        self.WP_plottingData = []
+
+    def setRedshift(self, z = 0):
         self.z = z
 
     def TestForRequiredVariables(self, Names):
@@ -52,7 +58,15 @@ class EuclidMaster:
         for name in Names:
             assert hasattr(self, name), "You need to assign {} first".format(name)
 
-    def loadMultiDarkHaloes(self, generateFigures = True, data_directory = "./BigData/", filename = "MD_" ):
+    def DarkMatter(self, type = "MultiDark"):
+        if type == "MultiDark":
+            self.loadMultiDarkHaloes() # TODO put these arguments into a parameter file.
+        elif type == "Analytic":
+            self.generateSemiAnalyticHaloes()
+        else:
+            assert False, "Unknown DarkMatter type {}".format(type)
+
+    def loadMultiDarkHaloes(self, generateFigures = True, filename = "MD_" ):
         """ Function to load in the data from the multidark halo catalogue
 
         This data should exist as .npy files in the Directory/BigData. Within
@@ -77,8 +91,8 @@ class EuclidMaster:
         self.volume = (self.axis)**3 # MultiDark Box size, Mpc
 
         # Search for the closest file and read it in.
-        file = GetCorrectFile(filename, self.z, directory = data_directory)
-        data = np.load(data_directory + file) # most of this is in h^-1 Mpc
+        file = GetCorrectFile(filename, self.z, directory = self.bigData)
+        data = np.load(self.bigData + file) # most of this is in h^-1 Mpc
 
         # If we want to generate the Halo Mass function figure, this section.
         if generateFigures:
@@ -111,7 +125,7 @@ class EuclidMaster:
         self.halo_mass = np.log10(data[:, 4]/self.h)#/self.h
         data = None # Just to make sure we're not overtaxing our memory
 
-    def generateSemiAnalyticHaloes(self, volume, mass_low = 12., mass_high = 16., generateFigures = True):
+    def generateSemiAnalyticHaloes(self, volume = 500, mass_low = 12., mass_high = 16., generateFigures = True):
         """Function to generate a cataloge of Semi-Analyic Haloes.
 
         Function to pull a catalogue of haloes from the halo mass function. A
@@ -329,6 +343,8 @@ class EuclidMaster:
             elif scatter == "fixed":
                 scatter = np.random.normal(0, scatter_magnitude, len(self.stellar_mass))
                 log_Black_Hole_Mass += scatter
+        else:
+            assert False, "Unknown SMBH type - {}".format(SMBH)
 
         self.SMBH_mass = log_Black_Hole_Mass
 
@@ -351,6 +367,52 @@ class EuclidMaster:
             savePath = self.visualValidatePath + 'BHMF_Validation.png'
             plt.savefig(savePath)
             plt.close()
+
+    def assignDutyCycle(self, function = "Mann"):
+        print("Assigning Duty Cycle, {}".format(function))
+        self.TestForRequiredVariables(["SMBH_mass", "stellar_mass"])
+
+        type_cost = type(function)
+        if type_cost is float or type_cost is int:
+            DC = np.ones_like(self.SMBH_mass) * function
+            self.dutycycle = DC
+        elif isinstance(function, str):
+            if function == "Mann":
+                if self.z > 0.1:
+                    print("Warning - Mann's duty cycle is not set up for redshifts other than zero")
+                Mann_path = self.dataPath + "Mann.csv"
+                df = pd.read_csv(Mann_path, header = None)
+                SM = df[0]
+                U = df[1]
+                fn = sp.interpolate.interp1d(SM, U)
+                output = np.zeros_like(self.stellar_mass)
+                output[self.stellar_mass < np.amin(SM)] = np.amin(U)
+                output[self.stellar_mass > np.amax(SM)] = np.amax(U)
+                cut = (self.stellar_mass < np.amax(SM)) * (self.stellar_mass > np.amin(SM))
+                output[cut] = fn(self.stellar_mass[cut])
+                self.dutycycle = 10**output
+
+            elif function == "Schulze":
+                # Find the nearest file to the redshift we want
+                schulzePath = self.dataPath + GetCorrectFile("Schulze", self.z, self.dataPath)
+                df = pd.read_csv(schulzePath, header = None)
+                Data_BH = df[0]
+                Data_DC = df[1]
+                DC = np.zeros_like(self.SMBH_mass)
+                getDC = sp.interpolate.interp1d(Data_BH, Data_DC)
+                fit = np.polyfit(Data_BH, Data_DC, 1)
+                DC[self.SMBH_mass < np.amin(Data_BH)] = getDC(np.amin(Data_BH)) # )fit[0]*self.SMBH_mass[self.SMBH_mass < np.amin(Data_BH)] + fit[1]
+                DC[self.SMBH_mass > np.amax(Data_BH)] = getDC(np.amax(Data_BH))
+                slice = (self.SMBH_mass > np.amin(Data_BH)) * (self.SMBH_mass < np.amax(Data_BH))
+                DC[slice] = getDC(self.SMBH_mass[slice])
+                self.dutycycle = 10**DC
+            else:
+                assert False, "Unknown Duty Cycle Type {}".format(function)
+        else:
+            assert False, "No duty cycle type specified"
+
+        assert self.dutycycle.any() >= 0.0, "DutyCycle elements < 0 exist. This is a probabiliy, and should therefore not valid"
+        assert self.dutycycle.any() <= 1.0, "DutyCycle elements > 1 exist. This is a probabiliy, and should therefore not valid"
 
 
 
@@ -412,67 +474,24 @@ class EuclidMaster:
 
         self.luminosity = lglum
 
-    def assignDutyCycle(self, function = "Mann", constant = 0.1):
-        print("Assigning Duty Cycle")
-        self.TestForRequiredVariables(["SMBH_mass", "stellar_mass"])
-
-        if function == "Mann":
-            if self.z > 0.1:
-                print("Warning - Mann's duty cycle is not set up for redshifts other than zero")
-            Mann_path = self.dataPath + "Mann.csv"
-            df = pd.read_csv(Mann_path, header = None)
-            SM = df[0]
-            U = df[1]
-            fn = sp.interpolate.interp1d(SM, U)
-            output = np.zeros_like(self.stellar_mass)
-            output[self.stellar_mass < np.amin(SM)] = np.amin(U)
-            output[self.stellar_mass > np.amax(SM)] = np.amax(U)
-            cut = (self.stellar_mass < np.amax(SM)) * (self.stellar_mass > np.amin(SM))
-            output[cut] = fn(self.stellar_mass[cut])
-            self.dutycycle = 10**output
-
-        elif function == "Schulze":
-            # Find the nearest file to the redshift we want
-            schulzePath = self.dataPath + GetCorrectFile("Schulze", self.z, self.dataPath)
-            df = pd.read_csv(schulzePath, header = None)
-            Data_BH = df[0]
-            Data_DC = df[1]
-            DC = np.zeros_like(self.SMBH_mass)
-            getDC = sp.interpolate.interp1d(Data_BH, Data_DC)
-            fit = np.polyfit(Data_BH, Data_DC, 1)
-            DC[self.SMBH_mass < np.amin(Data_BH)] = getDC(np.amin(Data_BH)) # )fit[0]*self.SMBH_mass[self.SMBH_mass < np.amin(Data_BH)] + fit[1]
-            DC[self.SMBH_mass > np.amax(Data_BH)] = getDC(np.amax(Data_BH))
-            slice = (self.SMBH_mass > np.amin(Data_BH)) * (self.SMBH_mass < np.amax(Data_BH))
-            DC[slice] = getDC(self.SMBH_mass[slice])
-            self.dutycycle = 10**DC
-
-        elif function == "Constant":
-            DC = np.ones_like(self.SMBH_mass) * constant
-            self.dutycycle = DC
-        else:
-            assert False, "No duty cycle type specified"
-
-        assert self.dutycycle.any() >= 0.0, "DutyCycle elements < 0 exist. This is a probabiliy, and should therefore not valid"
-        assert self.dutycycle.any() <= 1.0, "DutyCycle elements > 1 exist. This is a probabiliy, and should therefore not valid"
-
-    def getLuminosityFunction(self, start = 42, stop = 46, step = 0.1):
-        self.TestForRequiredVariables(["luminosity", "dutycycle"])
-        bins = np.arange(start, stop, step)
+        # Save Luminosity Function Data
+        step = 0.1
+        bins = np.arange(42, 46, step)
         Lum_bins = sp.stats.binned_statistic(self.luminosity, self.dutycycle, 'sum', bins = bins)[0]
         Lum_func = (Lum_bins/self.volume)/step
-        return np.log10(Lum_func[Lum_func > 0]), bins[0:-1][Lum_func > 0]
+        self.XLF_plottingData.append(PlottingData(bins[0:-1][Lum_func > 0], np.log10(Lum_func[Lum_func > 0])))
 
-    def getEddingtonDistribution(self, low = -4, high = 1, step = 0.5):
-        self.TestForRequiredVariables(["luminosity", "dutycycle"])
+        # Save Eddington Distribution Data
+        step = 0.5
         edd_derived = 25 * 10**self.luminosity / (1.26e38 * 0.002 * 10**self.stellar_mass)
-        eddbin = np.arange(low, high, step)
+        eddbin = np.arange(-4, 1, step)
         prob_derived = stats.binned_statistic(np.log10(edd_derived), self.dutycycle, 'sum', bins = eddbin)[0]/(step * sum(self.dutycycle))
 
         eddbin = eddbin[:-1]
         eddbin = eddbin[prob_derived > 0]
         prob_derived = prob_derived[prob_derived > 0]
 
-        return np.log10(prob_derived), eddbin
+        self.Edd_plottingData.append(PlottingData(eddbin, np.log10(prob_derived)))
 
     def CreateCatalogue(self, LumCut = True, LumLow = 42.01, LumHigh = 44.98):
         print("Creating Catalogue")
@@ -496,14 +515,14 @@ class EuclidMaster:
         else:
             lum_flag = 1
 
-        print("{}% of Galaxies remain as AGN".format(np.round(100 * np.sum(dutyCycleFlag * lum_flag)/len(self.x_coord), 2)))
+        print("    {}% of Galaxies remain as AGN".format(np.round(100 * np.sum(dutyCycleFlag * lum_flag)/len(self.x_coord), 2)))
 
         self.x_cat = self.x_coord[dutyCycleFlag * lum_flag]
         self.y_cat = self.y_coord[dutyCycleFlag * lum_flag]
         self.z_cat = self.z_coord[dutyCycleFlag * lum_flag]
         self.lum_cat = self.luminosity[dutyCycleFlag * lum_flag]
 
-    def Obscuration(self, Obscured = 23, returnObscured = True):
+    def Obscuration(self, ret = "Obscured", Obscured = 23):
         print("Calculating Obscuration")
         """Function to assign column density, Nh,
 
@@ -538,18 +557,20 @@ class EuclidMaster:
 
         N_h = lgNHAGNSch1
 
-        if returnObscured:
+        if ret == "Obscured":
             N_h_Obscured_Flag = N_h > Obscured
-            print("{}% of the remaining catalogue remains as obscured".format(np.round(100 * np.sum(N_h_Obscured_Flag)/len(N_h_Obscured_Flag), 2)))
+            print("    {}% of the remaining catalogue remains as obscured".format(np.round(100 * np.sum(N_h_Obscured_Flag)/len(N_h_Obscured_Flag), 2)))
             self.x_cat = self.x_cat[N_h_Obscured_Flag]
             self.y_cat = self.y_cat[N_h_Obscured_Flag]
             self.z_cat = self.z_cat[N_h_Obscured_Flag]
-        else:
+        elif ret == "Unobscured":
             N_h_unobscured_Flag = N_h < Obscured
-            print("{}% of the remaining catalogue remains as unobscured".format(np.round(100 * np.sum(N_h_unbscured_Flag)/len(N_h_unbscured_Flag), 2)))
+            print("    {}% of the remaining catalogue remains as unobscured".format(np.round(100 * np.sum(N_h_unbscured_Flag)/len(N_h_unbscured_Flag), 2)))
             self.x_cat = self.x_cat[N_h_unobscured_Flag]
             self.y_cat = self.y_cat[N_h_unobscured_Flag]
             self.z_cat = self.z_cat[N_h_unobscured_Flag]
+        else:
+            assert False, "Unknown argument name {}, should be Obscured or Unobscured".format(ret)
 
 
     def computeWP(self, threads = "System", pi_max = 50, binStart = -1, binStop = 1.5, binSteps = 50):
@@ -574,15 +595,8 @@ class EuclidMaster:
                 self.x_cat, self.y_cat, self.z_cat, verbose = True)
         xi = wp_results['wp']
 
-        return xi, rbins[:-1]
+        self.WP_plottingData.append(PlottingData(rbins[:-1], xi))
 
-@jit
-def lightningWhere(arr, low, high):
-    flag = np.zeros(len(arr), dtype = bool)
-    for i in range(len(arr)):
-        if (arr[i] >= low) and (arr[i] <= high):
-            flag[i] = True
-    return flag
 
 def Aird_edd_dist(edd, z):
     prob = np.ones((len(edd)), dtype='float64')
@@ -646,6 +660,10 @@ def NHfunc(lgLx, z, lgNH):
 
     return f; # The value of the function f itself.
 
+class PlottingData:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
 
 class data:
     # Parent class for data type objects
