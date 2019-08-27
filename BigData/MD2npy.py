@@ -25,7 +25,7 @@ first = True
 dat = []
 
 chunks = 0
-chunksize = 10**7
+chunksize = 10**6
 
 size_bytes = os.path.getsize(fname_input)
 
@@ -46,8 +46,10 @@ for df in pd.read_csv(fname_input, delimiter = "\s+", names = your_list, chunksi
         scale = df["scale"][0]
         redshift = 1/scale - 1
 
-        row = np.array2string(data[0, :])
-        size_string = utf8len(row)
+        row = np.array2string(df.values[0, :])
+        print(row)
+        size_string = utf8len(row) + len(row) # for the spaces
+        print("Bytes:", size_string)
         first = False
 
 
@@ -60,7 +62,7 @@ for df in pd.read_csv(fname_input, delimiter = "\s+", names = your_list, chunksi
 
 fname_output = "MD_{}.npy".format(np.round(redshift, 1))
 
-np.save(fname_output, data)
+np.save(fname_output, dat)
 
 sec = timedelta(seconds=int(time()-nowtime))
 d = datetime(1,1,1)+sec
