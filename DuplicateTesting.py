@@ -86,6 +86,29 @@ class VariationManager:
                     function_list[j](*sub)
             first = False
 
+        def JargonShorten(string):
+            if string == "Redshift":
+                return "z"
+            if string == "Dark Matter":
+                return ""
+            if string == "Stellar Mass":
+                return "SMHM"
+            if string == "Black Hole Mass":
+                return "SMBHM"
+            if string == "Duty Cycle":
+                return "U"
+            if string == "Eddington":
+                return "Edd"
+            if string == "Obscuration":
+                return ""
+            if string == "Catalogue":
+                return "Lx Cut"
+            return string
+
+        def ShowInTitle(string):
+            if string == "Clustering" or string == "Stellar Mass" or string == "Black Hole Mass":
+                return False
+            return True
 
         # Prepare titles
         title_array = []
@@ -95,10 +118,11 @@ class VariationManager:
             title = ""
             legend = ""
             for j, name in enumerate(name_param_lookup):
-                if counts[j] == 1:
-                    title += " {}: {},".format(name, name_param_lookup[name][map[j]-1])
+                if counts[j] == 1: # In the case where there is only one variation on this parameter, put it in the title.
+                    if ShowInTitle(name):
+                        title += " {}: {},".format(JargonShorten(name), name_param_lookup[name][map[j]-1])
                 else:
-                    legend += " {}: {},".format(name, name_param_lookup[name][map[j]-1])
+                    legend += " {}: {},".format(JargonShorten(name), name_param_lookup[name][map[j]-1])
             title_array.append(title)
             legend_array.append(legend)
 
@@ -159,7 +183,7 @@ class VariationManager:
         plt.errorbar(wp_data.r_Koutoulidis, wp_data.wp_Koutoulidis,\
                         yerr = wp_data.wp_Koutoulidis_e, fmt='o', label = "Koutoulidis Data")
 
-        plt.plot(obj.wpbins, wp_data.K_powerLaw(Obj.wpbins), label = "Koutoulidis Fit")
+        plt.plot(Obj.wpbins, wp_data.K_powerLaw(Obj.wpbins), label = "Koutoulidis Fit")
         plt.title(title_array[0])
         #r'wp, z = {}, U = {}'.format(redshift, dutycycle), fontname = 'Times New Roman')
         plt.xlabel(r'$r_p$ $Mpc$')
