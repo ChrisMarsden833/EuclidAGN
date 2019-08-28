@@ -247,7 +247,7 @@ class EuclidMaster:
         self.TestForRequiredVariables(["z", "halo_mass"])
 
         if self.halotype == "N-Body":
-            working_redshift = (1/self.scaleAtAcc) - 1
+            working_redshift = (1/self.scaleAtAcc) - 1 # TODO Update for only for satalites - Macc, Scale at acc, Centrals - redshift now, mass now
         else:
             working_redshift = self.z
 
@@ -521,6 +521,7 @@ class EuclidMaster:
         self.y_cat = self.y_coord[dutyCycleFlag * lum_flag]
         self.z_cat = self.z_coord[dutyCycleFlag * lum_flag]
         self.lum_cat = self.luminosity[dutyCycleFlag * lum_flag]
+        self.dc_cat = self.dutycycle[dutyCycleFlag * lum_flag]
 
     def Obscuration(self, ret = "Obscured", Obscured = 23):
         print("Calculating Obscuration")
@@ -563,12 +564,14 @@ class EuclidMaster:
             self.x_cat = self.x_cat[N_h_Obscured_Flag]
             self.y_cat = self.y_cat[N_h_Obscured_Flag]
             self.z_cat = self.z_cat[N_h_Obscured_Flag]
+            self.dc_cat = self.dc_cat[N_h_Obscured_Flag]
         elif ret == "Unobscured":
             N_h_unobscured_Flag = N_h < Obscured
             print("    {}% of the remaining catalogue remains as unobscured".format(np.round(100 * np.sum(N_h_unbscured_Flag)/len(N_h_unbscured_Flag), 2)))
             self.x_cat = self.x_cat[N_h_unobscured_Flag]
             self.y_cat = self.y_cat[N_h_unobscured_Flag]
             self.z_cat = self.z_cat[N_h_unobscured_Flag]
+            self.dc_cat = self.dc_cat[N_h_unobscured_Flag]
         else:
             assert False, "Unknown argument name {}, should be Obscured or Unobscured".format(ret)
 
@@ -592,7 +595,8 @@ class EuclidMaster:
         rbins = np.logspace(-1, 1.5, 50)
         self.wpbins = rbins
         wp_results = wp(period, pi_max, threads, rbins,\
-                self.x_cat, self.y_cat, self.z_cat, verbose = True)
+                self.x_cat, self.y_cat, self.z_cat, weights = self.dc_cat, weight_type = 'pair_product', verbose = True)
+        # TODO Add Weights
         xi = wp_results['wp']
 
         self.WP_plottingData.append(PlottingData(rbins[:-1], xi))

@@ -16,7 +16,7 @@ with open('header.txt', 'r') as f:
   reader = csv.reader(f)
   your_list = list(reader)[0]
 
-list = ["x", "y", "z", "Acc_Scale", "Macc", "mvir"]
+list = ["x", "y", "z", "Acc_Scale", "Macc", "M200c", "upid", "id"]
 
 fname_input = argv[1]
 
@@ -46,9 +46,11 @@ for df in pd.read_csv(fname_input, delimiter = "\s+", names = your_list, chunksi
         scale = df["scale"][0]
         redshift = 1/scale - 1
 
-        row = np.array2string(df.values[0, :])
-        print(row)
-        size_string = utf8len(row) + len(row) # for the spaces
+        row = df.iloc[[0]].to_string(index = False, header = False)
+        size_string = utf8len(row)
+        #row = np.array2string(df.values[0, :])
+        #print(row)
+        size_string = utf8len(row) * 4 # for the spaces
         print("Bytes:", size_string)
         first = False
 
