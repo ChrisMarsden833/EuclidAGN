@@ -9,6 +9,7 @@ import os
 import re
 import multiprocessing
 from numba import jit
+from math import pi
 
 # Specific Libraries
 from colossus.cosmology import cosmology
@@ -42,6 +43,7 @@ class EuclidMaster:
         self.XLF_plottingData = []
         self.Edd_plottingData = []
         self.WP_plottingData = []
+        self.bias_plottingData = []
 
     def setRedshift(self, z = 0):
         self.z = z
@@ -180,15 +182,15 @@ class EuclidMaster:
         #flagsat = np.where(idh > 0)
         #flagcen = np.where(idh < 1)
 
+        #self.Mvir = data["Mvir"]/self.h
+        #self.First_Acc_Mvir = data["First_Acc_Mvir"]/self.h
+
         self.x_coord = x_coord
         self.y_coord = y_coord
         self.z_coord = z_coord
         self.effective_halo_mass = np.log10(halo_mass)
         self.effective_z = effective_z
         self.parent_halo_mass = np.log10(mvir_par)
-        #self.Mvir = data["Mvir"]/self.h
-        #self.First_Acc_Mvir = data["First_Acc_Mvir"]/self.h
-
 
     def generateSemiAnalyticHaloes(self, volume = 500, mass_low = 12., mass_high = 16., generateFigures = True):
         """Function to generate a cataloge of Semi-Analyic Haloes.
@@ -480,8 +482,6 @@ class EuclidMaster:
         assert self.dutycycle.any() >= 0.0, "DutyCycle elements < 0 exist. This is a probabiliy, and should therefore not valid"
         assert self.dutycycle.any() <= 1.0, "DutyCycle elements > 1 exist. This is a probabiliy, and should therefore not valid"
 
-
-
     def assignEddingtonRatios(self, type = "Schechter", redshift_evolution = False, knee = -1, alpha = -0.65):
         """Function to assign Eddington ratios and luminosities.
 
@@ -503,7 +503,7 @@ class EuclidMaster:
             z0 = 0.6
             #knee = -1
             A = 10.**(-1.41)
-            prob = A*((edd/(10.**(knee)))**gammaE)
+            prob = ((edd/(10.**(knee)))**gammaE)
 
             if redshift_evolution:
                 prob *= ((1.+z)/(1.+z0))**gammaz
@@ -629,6 +629,8 @@ class EuclidMaster:
 
         N_h = lgNHAGNSch1
 
+        self.obscured = N_h > Obscured
+
         if ret == "Obscured":
             N_h_Obscured_Flag = N_h > Obscured
             print("    {}% of the remaining catalogue remains as obscured".format(np.round(100 * np.sum(N_h_Obscured_Flag)/len(N_h_Obscured_Flag), 2)))
@@ -645,7 +647,6 @@ class EuclidMaster:
             self.dc_cat = self.dc_cat[N_h_unobscured_Flag]
         else:
             assert False, "Unknown argument name {}, should be Obscured or Unobscured".format(ret)
-
 
     def computeWP(self, threads = "System", pi_max = 50, binStart = -1, binStop = 1.5, binSteps = 50):
         print("Computing wp")
@@ -670,6 +671,153 @@ class EuclidMaster:
         xi = wp_results['wp']
 
         self.WP_plottingData.append(PlottingData(rbins[:-1], xi))
+
+    def computeBias(self, variable, binsize = 0.3, weight = True, mask = None):
+        # Functions borrowed from Viola's Code - I'm not entirely sure what they all do.
+        requiredVariables = ["parent_halo_mass"]
+        if weight:
+            requiredVariables.append("dutycycle")
+        self.TestForRequiredVariables(requiredVariables)
+
+        def func_g_squared(z):
+            matter = self.cosmology.Om0*(1+z)**3
+            curvature = (1 - self.cosmology.Om0 - self.cosmology.Ode0)*(1+z)**2
+            return matter + curvature + self.cosmology.Ode0
+
+        def func_D(Omega, Omega_L):
+            # Helper functions
+            A = 5 * Omega / 2
+            B = Omega**(4/7.) - Omega_L
+            C = 1 + Omega / 2
+            D = 1 + Omega_L / 70.
+            D = A / (B + C * D)
+            return D
+
+        def func_Omega_L(Omega_L0, g_squared):
+            # Eisenstein 1999
+            return Omega_L0 / g_squared
+
+        def func_delta_c(delta_0_crit, D):
+            # delta_c as a function of omega and linear growth
+            # van den Bosch 2001
+            return delta_0_crit / D
+
+        def func_delta_0_crit(Omega, p):
+            # A3 van den Bosch 2001
+            return 0.15 * (12*3.14159)**(2/3.) * Omega**p
+
+        def func_p(Omega_m0, Omega_L0):
+            # A4 van den Bosch 2001
+            if (Omega_m0 < 1 and Omega_L0 == 0):
+                return 0.0185
+            if (Omega_m0 + Omega_L0 == 1.0):
+                return 0.0055
+            else:
+                return 0.0055 # VIOLA, had to add this in to make it work with my cosmology, I assume this is okay?
+
+        def func_Omega(z, Omega_m0, g_squared):
+            # A5 van den Bosch 2001 / eq 10 Eisenstein 1999
+            return Omega_m0 * (1+z)**3 / g_squared
+
+        def func_sigma(sigma_8, f, f_8):
+            # A8 van den Bosch 2001
+            return sigma_8 * f / f_8
+
+        def func_u_8(Gamma):
+            # A9 van den Bosch 2001
+            return 32 * Gamma
+
+        def func_u(Gamma, M):
+            # A9 van den Bosch 2001
+            return 3.804e-4 * Gamma * (M/self.cosmology.Om0)**(1/3.)
+
+        def func_f(u):
+            # A10 van den Bosch 2001
+            common = 64.087
+            factors = (1, 1.074, -1.581, 0.954, -0.185)
+            exps = (0, 0.3, 0.4, 0.5, 0.6)
+
+            ret_val = 0.0
+            for i in range(len(factors)):
+                ret_val += factors[i] * u ** exps[i]
+
+            return common * ret_val**(-10)
+
+        def func_b_eul(nu, delta_sc=1.686, a=0.707, b=0.5, c=0.6):
+            # eq. 8 Sheth 2001
+            A = np.sqrt(a) * delta_sc
+            B = np.sqrt(a) * a * nu**2
+            C = np.sqrt(a) * b * (a * nu**2)**(1-c)
+            D = (a * nu**2)**c
+            E = (a*nu**2)**c + b*(1-c)*(1-c/2)
+            return 1 + (B + C - D/E)/A
+
+        def func_b_eulTin(nu, delta_sc=1.686, a=0.707, b=0.35, c=0.8):
+            # eq. 8 Tinker 2005
+            A = np.sqrt(a) * delta_sc
+            B = np.sqrt(a) * a * nu**2
+            C = np.sqrt(a) * b * (a * nu**2)**(1-c)
+            D = (a * nu**2)**c
+            E = (a*nu**2)**c + b*(1-c)*(1-c/2)
+
+            return 1 + (B + C - D/E)/A
+
+        def estimate_sigma(M, z, g_squared, Omega_m0 = self.cosmology.Om0, Gamma=0.2, sigma_8=0.8):
+            # Estimate sigma for a set of masses
+            # vdb A9
+            u = func_u(Gamma, M)
+            u_8 = func_u_8(Gamma)
+            # vdb A10
+            f = func_f(u)
+            f_8 = func_f(u_8)
+            # vdb A8
+            sigma = func_sigma(sigma_8, f, f_8)
+            return sigma
+
+        def estimate_delta_c(M, z, g_squared, Gamma=0.2, Omega_m0 = self.cosmology.Om0, Omega_L0 = self.cosmology.Ode0):
+            # Estimate delta_c for a set of masses
+            # Redshift/model dependant parameters
+            Omega = func_Omega(z, Omega_m0, g_squared)
+            Omega_L = func_Omega_L(Omega_L0, g_squared)
+            # vdb A3
+            p = func_p(Omega_m0, Omega_L0)
+            # Allevato code
+            D1 = func_D(Omega, Omega_L) / (1 + z)
+            D0 = func_D(Omega_m0, Omega_L0)
+            D = D1/D0
+            delta_0_crit = func_delta_0_crit(Omega, p)
+            # TODO: remove
+            delta_0_crit = 1.686
+            delta_c = func_delta_c(delta_0_crit, D)
+            return (delta_c, delta_0_crit)
+
+        def estimate_biasTin(M, z, g_squared, Gamma=0.2, Omega_m0=self.cosmology.Om0, Omega_L0 = self.cosmology.Ode0, sigma_8 = 0.8):
+            # Estimate the bias Tinker + 2005
+            sigma = estimate_sigma(M, z, g_squared, Omega_m0, Gamma, sigma_8)
+            delta_c, delta_0_crit = estimate_delta_c(M, z, g_squared, Gamma, Omega_m0, Omega_L0)
+            nu = delta_c / sigma
+            return func_b_eulTin(nu, delta_0_crit)
+
+        g_squared = func_g_squared(self.z)
+        bias = estimate_biasTin(((10.**self.parent_halo_mass)*0.974)*self.h, 0.25, g_squared) # So this is the bias of the haloes?
+
+        bin = np.arange(np.amin(variable), np.amax(variable), binsize)
+        meanbias = np.zeros_like(bin)
+        errorbias = np.zeros_like(bin)
+
+        for i in range(len(bin)-1):
+            N1 = np.where(((variable) >= bin[i]) & ((variable) < bin[i+1]))
+            if mask != None:
+                N1 *= mask # Mask out for obscured etc if we want to.
+            if weight:
+                meanbias[i] = np.sum(bias[N1]*self.dutycycle[N1])/np.sum(self.dutycycle[N1])
+                errorbias = np.sqrt((np.sum(self.dutycycle[N1] * (bias[N1] - meanbias[i])**2))/(((self.dutycycle[N1] - 1)/len(self.dutycycle[N1])) * np.sum(self.dutycycle[N1])))
+            else:
+                meanbias[i] = np.mean(bias[N1])
+                errorbias = np.std(bias[N1])
+
+        self.bias_plottingData.append(PlottingData(bin, meanbias, errorbias))
+
 
 
 def Aird_edd_dist(edd, z):
@@ -735,7 +883,7 @@ def NHfunc(lgLx, z, lgNH):
     return f; # The value of the function f itself.
 
 class PlottingData:
-    def __init__(self, x, y):
+    def __init__(self, x, y, error = None):
         self.x = x
         self.y = y
 
