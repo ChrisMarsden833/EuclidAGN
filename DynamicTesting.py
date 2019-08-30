@@ -91,22 +91,25 @@ class EuclidMaster:
         self.volume = (self.axis)**3 # MultiDark Box size, Mpc
 
         # Search for the closest file and read it in.
-        file = GetCorrectFile(filename, self.z, directory = self.bigData)
+        file, retz = GetCorrectFile(filename, self.z, directory = self.bigData, retz = True)
         data = np.load(self.bigData + file) # most of this is in h^-1 Mpc
 
         # If we want to generate the Halo Mass function figure, this section.
         if generateFigures:
             width = 0.1
             bins = np.arange(10, 15, width)
-            hist = np.histogram(np.log10(data[:, 5]/self.h), bins = bins)[0]
+            hist = np.histogram(np.log10(data["mvir"]/self.h), bins = bins)[0]
             volume = self.volume
             hmf = (hist/(volume))/(width)
-            binwidth = 0.01
-            M = 10**np.arange(10.0, 15.0, binwidth) + np.log10(self.h) # In unit's of h, for now.
-            mfunc = mass_function.massFunction(M*self.h, self.z, mdef = 'vir', model = 'tinker08', q_out = 'dndlnM')*np.log(10) *(self.h**3) #dn/dlog10M
             fig = plt.figure()
             plt.plot(10**bins[0:-1], hmf, 'o', label = "Multi-Dark")
-            plt.plot(M, mfunc, label = "Colossus")
+            try:
+                binwidth = 0.01
+                M = 10**np.arange(10.0, 15.0, binwidth) + np.log10(self.h) # In unit's of h, for now.
+                mfunc = mass_function.massFunction(M*self.h, self.z, mdef = 'vir', model = 'tinker08', q_out = 'dndlnM')*np.log(10) *(self.h**3) #dn/dlog10M
+                plt.plot(M, mfunc, label = "Colossus")
+            except:
+                print("Colossus Failed to plot HMF")
             plt.xlabel("Halo Mass $M_\odot$")
             plt.ylabel(r'$d\phi /d(log\;L_x)\;[Mpc^{-3}]$')
             plt.title("Halo Mass function from Multidark, z = {}".format(self.z))
@@ -118,12 +121,74 @@ class EuclidMaster:
             plt.close()
 
         # Store the data in class variables, correcting for h.
-        self.x_coord = data[:, 0]/self.h
-        self.y_coord = data[:, 1]/self.h
-        self.z_coord = data[:, 2]/self.h
-        self.scaleAtAcc = data[:, 3]
-        self.halo_mass = np.log10(data[:, 4]/self.h)#/self.h
-        data = None # Just to make sure we're not overtaxing our memory
+
+        x_coord = data['x']/self.h
+        y_coord = data['y']/self.h
+        z_coord = data['z']/self.h
+        id = data["id"]
+        upid = data["upid"]
+        mvir = data["mvir"]/self.h
+        macc = data["Macc"]/self.h
+        aacc = data["Acc_Scale"]
+
+        del data # Save on memory
+
+        # Reserved mem
+        mvir_par = np.zeros_like(mvir)
+        idh = np.zeros_like(mvir)
+        effective_z = np.zeros_like(aacc)
+
+        print('    sorting list w.r.t. upId')
+        inds = upid.argsort() # + 1 Array, rest are reused
+        x_coord = x_coord[inds]
+        y_coord = y_coord[inds]
+        z_coord = z_coord[inds]
+        id = id[inds]
+        upid = upid[inds]
+        mvir = mvir[inds]
+        macc = macc[inds]
+        aacc = aacc[inds]
+        upid0 = np.searchsorted(upid, 0) # Position where zero should sit on the now sorted upid.
+        # All arrays are now sorted by upid
+
+        print('    copying all ', str(upid0), 'elements with upid = -1')
+        mvir_par[:upid0] = mvir[:upid0] # MVir of centrals, or where upid  = -1, so just the mass.
+        #idh[:upid0] = 0 # Does nothing?
+
+        print('    sorting remaining list list w.r.t. rockstarId')
+        upid_cut = upid[upid0:] # Upids that are not -1, or the satalites, with a value pointing to their progenitor.
+
+        id_cut = id[:upid0] # ids of centrals
+        mvir_cut = mvir[:upid0] # masses of centrals
+
+        inds = id_cut.argsort() # get indexes to centrals by id.
+        id_cut = id_cut[inds] # actually sort centrals by id.
+        mvir_cut = mvir_cut[inds] # sort virial masses the same way.
+
+        print('    copying remaining', str(len(upid) - upid0), 'elements')
+        inds = np.searchsorted(id_cut, upid_cut) # indexes of where satalite id's point to centrals
+        mvir_par[upid0:] = mvir_cut[inds] # Sort mvir_par by this, and assign it to the sat part of mvir_par
+        # This gives us the virial mass of the parent or itself if it is a parent. But do we acutally need this?
+        idh[upid0:] = 1
+
+        halo_mass = mvir
+        halo_mass[idh > 0] = macc[idh > 0]
+
+        effective_z[idh > 0] = 1/aacc[idh > 0] - 1
+        effective_z[idh < 1] = retz
+
+        #flagsat = np.where(idh > 0)
+        #flagcen = np.where(idh < 1)
+
+        self.x_coord = x_coord
+        self.y_coord = y_coord
+        self.z_coord = z_coord
+        self.effective_halo_mass = np.log10(halo_mass)
+        self.effective_z = effective_z
+        self.parent_halo_mass = np.log10(mvir_par)
+        #self.Mvir = data["Mvir"]/self.h
+        #self.First_Acc_Mvir = data["First_Acc_Mvir"]/self.h
+
 
     def generateSemiAnalyticHaloes(self, volume = 500, mass_low = 12., mass_high = 16., generateFigures = True):
         """Function to generate a cataloge of Semi-Analyic Haloes.
@@ -224,7 +289,7 @@ class EuclidMaster:
             plt.savefig(savePath)
             plt.close()
 
-        self.halo_mass = np.log10(masses_cataloge)
+        self.effective_halo_mass = np.log10(masses_cataloge)
 
     def assignStellarMass(self, formula = "Grylls18", scatter = True, scatter_scale = 0.001, generateFigures = True):
         """Function to generate stellar masses from halo masses.
@@ -244,10 +309,10 @@ class EuclidMaster:
         """
         print("Assigning Stellar Mass")
         # Tests
-        self.TestForRequiredVariables(["z", "halo_mass"])
+        self.TestForRequiredVariables(["effective_halo_mass", "effective_z"])
 
         if self.halotype == "N-Body":
-            working_redshift = (1/self.scaleAtAcc) - 1 # TODO Update for only for satalites - Macc, Scale at acc, Centrals - redshift now, mass now
+            working_redshift = self.effective_z # TODO Update for only for satalites - Macc, Scale at acc, Centrals - redshift now, mass now
         else:
             working_redshift = self.z
 
@@ -267,8 +332,9 @@ class EuclidMaster:
         b = beta10 + beta11*zparameter
         g = gamma10 + gamma11*zparameter
         # Full formula
-        DM = self.halo_mass
-        SM = np.log10(np.power(10, DM) * (2*N*np.power( (np.power(np.power(10,DM-M), -b) + np.power(np.power(10,DM-M), g)), -1)))
+        #DM = self.effective_halo_mass
+        SM = np.log10(np.power(10, self.effective_halo_mass) * (2*N*np.power( (np.power(np.power(10,self.effective_halo_mass-M), -b) + np.power(np.power(10,self.effective_halo_mass-M), g)), -1)))
+        del self.effective_halo_mass
         # Add scatter, if requested.
         if scatter:
             SM += np.random.normal(scale = scatter_scale, size = np.shape(SM))
@@ -450,7 +516,8 @@ class EuclidMaster:
                 assert False, "Type is unknown"
 
         self.TestForRequiredVariables(["SMBH_mass"])
-        Ledd = 1.28e38*(10.**self.SMBH_mass)
+        #Ledd = 1.28e38*(10.**self.SMBH_mass)
+        Ledd = 38.1072 + self.SMBH_mass
 
         eddbin = np.arange(-4, 1, 0.0001, dtype = float)
         probSche = Schefunc(10**eddbin, self.z)
@@ -465,10 +532,14 @@ class EuclidMaster:
 
         a = np.random.random(len(self.SMBH_mass))
         lgedd = np.interp(a, y, eddbin) #, right=-99)
-        edd = 10.**lgedd
-        Lbol = (edd)*Ledd
+        Lbol = lgedd + Ledd
 
-        lgLbol = np.log10(Lbol) - 33.49
+
+        #edd = 10.**lgedd
+        #Lbol = (edd)*Ledd
+        #lgLbol = np.log10(Lbol) - 33.49
+
+        lgLbol = Lbol - 33.49
         lglum = lgLbol - 1.54 - (0.24*(lgLbol-12.)) - (0.012*((lgLbol-12.)**2.)) + (0.0015*((lgLbol-12.)**3.))
         lglum = lglum  + 33.49
 
@@ -483,9 +554,9 @@ class EuclidMaster:
 
         # Save Eddington Distribution Data
         step = 0.5
-        edd_derived = 25 * 10**self.luminosity / (1.26e38 * 0.002 * 10**self.stellar_mass)
+        Lg_edd_derived = np.log10(25) + self.luminosity - (35.3802 + self.stellar_mass)  #log10(1.26e38 * 0.002) = 35.3802
         eddbin = np.arange(-4, 1, step)
-        prob_derived = stats.binned_statistic(np.log10(edd_derived), self.dutycycle, 'sum', bins = eddbin)[0]/(step * sum(self.dutycycle))
+        prob_derived = stats.binned_statistic(Lg_edd_derived, self.dutycycle, 'sum', bins = eddbin)[0]/(step * sum(self.dutycycle))
 
         eddbin = eddbin[:-1]
         eddbin = eddbin[prob_derived > 0]
@@ -596,7 +667,6 @@ class EuclidMaster:
         self.wpbins = rbins
         wp_results = wp(period, pi_max, threads, rbins,\
                 self.x_cat, self.y_cat, self.z_cat, weights = self.dc_cat, weight_type = 'pair_product', verbose = True)
-        # TODO Add Weights
         xi = wp_results['wp']
 
         self.WP_plottingData.append(PlottingData(rbins[:-1], xi))
@@ -845,7 +915,7 @@ class EddingtonDistributionData(data):
 
 
 
-def GetCorrectFile(string, redshift, directory = "./"):
+def GetCorrectFile(string, redshift, directory = "./", retz = False):
     numeric_const_pattern = '[-+]? (?: (?: \d* \. \d+ ) | (?: \d+ \.? ) )(?: [Ee] [+-]? \d+ ) ?'
     rx = re.compile(numeric_const_pattern, re.VERBOSE)
 
@@ -868,7 +938,10 @@ def GetCorrectFile(string, redshift, directory = "./"):
     diff = abs(redshift - list[index])
     if diff > 0.1:
         print("Warning - we have requested redshift {} - Selecting file {} as it is closest".format(redshift, string_list[index]))
-    return string_list[index]
+    if retz:
+        return string_list[index], list[index]
+    else:
+        return string_list[index]
 
 def ReadSimpleFile(string, redshift, path):
     file = path + GetCorrectFile(string, redshift, path)
