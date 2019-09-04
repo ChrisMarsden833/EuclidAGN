@@ -9,6 +9,8 @@ from time import time, sleep
 from datetime import datetime, timedelta
 
 files = ["hlist_0.33030.list", "hlist_0.40320.list", "hlist_0.50320.list", "hlist_0.65650.list", "hlist_0.80130.list", "hlist_0.91520.list", "hlist_1.00000.list"]
+#files = ["hlist_0.80130.list"]
+
 
 supertime = time()
 
@@ -21,10 +23,12 @@ for fname_input in files:
 
     nowtime = time()
 
-    with open('header.txt', 'r') as f:
+    schema_directory = "./Schema/"
+
+    with open(schema_directory + "header.txt", 'r') as f:
         reader = csv.reader(f)
         names = list(reader)[0]
-    with open('dtypes.txt', 'r') as f:
+    with open(schema_directory + "dtypes.txt", 'r') as f:
         reader = csv.reader(f)
         types = list(reader)[0]
 
@@ -50,9 +54,11 @@ for fname_input in files:
     chunks = 0
     chunksize = 10**6
 
-    size_bytes = os.path.getsize(fname_input)
+    subfolder = "./Data/"
 
-    for df in pd.read_csv(fname_input, delimiter = "\s+", chunksize = chunksize, comment = '#', names = names, dtype = input_types):
+    size_bytes = os.path.getsize(subfolder + fname_input)
+
+    for df in pd.read_csv(subfolder + fname_input, delimiter = "\s+", chunksize = chunksize, comment = '#', names = names, dtype = input_types):
 
 
 
@@ -85,7 +91,9 @@ for fname_input in files:
 
     #print(data.values[:, 0])
 
-    fname_output = "MD_{}.npy".format(np.round(redshift, 1))
+    fname_output = "MD_{}.npy".format(np.round(redshift, 3))
+
+    output_directory = "./npy_files/"
 
     print("Saving file", fname_output)
     #dat = dat.view(type)

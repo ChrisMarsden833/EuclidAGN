@@ -94,27 +94,34 @@ class EuclidMaster:
 
         # Search for the closest file and read it in.
         file, retz = GetCorrectFile(filename, self.z, directory = self.bigData, retz = True)
+        print("Found file:", file)
         data = np.load(self.bigData + file) # most of this is in h^-1 Mpc
+
+        print(data.dtype)
 
         # If we want to generate the Halo Mass function figure, this section.
         if generateFigures:
+            upid = data["upid"]
             width = 0.1
             bins = np.arange(10, 15, width)
-            hist = np.histogram(np.log10(data["mvir"]/self.h), bins = bins)[0]
+            hist = np.histogram(np.log10(data["mvir"][upid == -1]/self.h), bins = bins)[0]
             volume = self.volume
             hmf = (hist/(volume))/(width)
             fig = plt.figure()
             plt.plot(10**bins[0:-1], hmf, 'o', label = "Multi-Dark")
+
             try:
                 binwidth = 0.01
                 M = 10**np.arange(10.0, 15.0, binwidth) + np.log10(self.h) # In unit's of h, for now.
                 mfunc = mass_function.massFunction(M*self.h, self.z, mdef = 'vir', model = 'tinker08', q_out = 'dndlnM')*np.log(10) *(self.h**3) #dn/dlog10M
-                plt.plot(M, mfunc, label = "Colossus")
+                #plt.plot(M, mfunc, label = "Colossus")
             except:
                 print("Colossus Failed to plot HMF")
-            plt.xlabel("Halo Mass $M_\odot$")
-            plt.ylabel(r'$d\phi /d(log\;L_x)\;[Mpc^{-3}]$')
-            plt.title("Halo Mass function from Multidark, z = {}".format(self.z))
+            #np.savetxt("HMF.txt", np.c_[np.log10(10**bins[0:-1]), np.log10(hmf)] )
+
+            plt.xlabel("Halo Mass $M_\odot/h$")
+            plt.ylabel(r'$d\phi /d(log\;L_x)\;[Mpc^{-3}]/h$')
+            plt.title("Halo Mass function from Multidark (centrals), z = {}".format(self.z))
             plt.loglog()
             plt.legend()
             # Write the file to the approprate location.
@@ -811,12 +818,12 @@ class EuclidMaster:
                 N1 *= mask # Mask out for obscured etc if we want to.
             if weight:
                 meanbias[i] = np.sum(bias[N1]*self.dutycycle[N1])/np.sum(self.dutycycle[N1])
-                errorbias = np.sqrt((np.sum(self.dutycycle[N1] * (bias[N1] - meanbias[i])**2))/(((self.dutycycle[N1] - 1)/len(self.dutycycle[N1])) * np.sum(self.dutycycle[N1])))
+                errorbias[i] = np.sqrt((np.sum(self.dutycycle[N1] * (bias[N1] - meanbias[i])**2))/(((self.dutycycle[N1] - 1)/len(self.dutycycle[N1])) * np.sum(self.dutycycle[N1])))
             else:
                 meanbias[i] = np.mean(bias[N1])
-                errorbias = np.std(bias[N1])
+                errorbias[i] = np.std(bias[N1])
 
-        self.bias_plottingData.append(PlottingData(bin, meanbias, errorbias))
+        self.bias_plottingData.append(PlottingData(bin[0:-1], meanbias[0:-1], errorbias[0:-1]))
 
 
 
