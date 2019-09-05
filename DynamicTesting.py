@@ -818,7 +818,7 @@ class EuclidMaster:
                 N1 *= mask # Mask out for obscured etc if we want to.
             if weight:
                 meanbias[i] = np.sum(bias[N1]*self.dutycycle[N1])/np.sum(self.dutycycle[N1])
-                errorbias[i] = np.sqrt((np.sum(self.dutycycle[N1] * (bias[N1] - meanbias[i])**2))/(((self.dutycycle[N1] - 1)/len(self.dutycycle[N1])) * np.sum(self.dutycycle[N1])))
+                errorbias[i] = np.sqrt((np.sum(self.dutycycle[N1] * (bias[N1] - meanbias[i])**2))/(((len(self.dutycycle[N1]) - 1)/len(self.dutycycle[N1])) * np.sum(self.dutycycle[N1])))
             else:
                 meanbias[i] = np.mean(bias[N1])
                 errorbias[i] = np.std(bias[N1])
