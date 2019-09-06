@@ -44,6 +44,7 @@ class EuclidMaster:
         self.Edd_plottingData = []
         self.WP_plottingData = []
         self.bias_plottingData = []
+        self.HOD_plottingData = []
 
     def setRedshift(self, z = 0):
         self.z = z
@@ -195,9 +196,11 @@ class EuclidMaster:
         self.x_coord = x_coord
         self.y_coord = y_coord
         self.z_coord = z_coord
+        self.mvir = mvir
         self.effective_halo_mass = np.log10(halo_mass)
         self.effective_z = effective_z
         self.parent_halo_mass = np.log10(mvir_par)
+        self.upid = upid
 
     def generateSemiAnalyticHaloes(self, volume = 500, mass_low = 12., mass_high = 16., generateFigures = True):
         """Function to generate a cataloge of Semi-Analyic Haloes.
@@ -824,6 +827,49 @@ class EuclidMaster:
                 errorbias[i] = np.std(bias[N1])
 
         self.bias_plottingData.append(PlottingData(bin[0:-1], meanbias[0:-1], errorbias[0:-1]))
+
+
+    def CalculateHOD(self, Centrals = True, weights = True):
+        """Docstring
+        """
+        flagCentrals = np.where(self.upid > 0) # Centrals
+
+        Halo_mass = np.log10(self.mvir)
+
+        bins = np.arange(11, 15, 0.1)
+        bins_out = bins[0:-1]
+
+        hist_Centrals_unweighted = np.histogram(Halo_mass[flagCentrals], bins)[0]
+        hist_all = np.histogram(Halo_mass, bins)[0]
+
+        if Centrals:
+            flag = flagCentrals
+        elif not Centrals:
+            flag = np.invert(flagCentrals)
+        else:
+            assert False, "Invalid Value for centrals, should be Boolean"
+
+        if weights:
+            hist_subject = np.histogram(Halo_mass[flag], bins, weights = self.dutycycle[flag])[0]
+        elif not weights:
+            hist_subject = np.histogram(Halo_mass[flag], bins)[0]
+        else:
+            assert False, "Invalud value for weights, should be Boolean"
+
+        t = np.where(bins_out <= 11.7 ) # Not qute sure what these are, or what they are for?
+        h = np.where(bins_out > 11.2 )
+        l = np.where(bins_out <= 11.2 )
+
+        hod = np.zeros_like(bins_out)
+
+        if not Centrals: # Not sure why we are doing this?
+            hod[t] = 0.0001
+            hod = hist_subject/hist_Centrals_unweighted
+        else:
+            hod[h] = hist_subject[h]/hist_Centrals_unweighted[h]
+            hod[l] = hist_subject[l]/hist_all[l]
+
+        self.HOD_plottingData.append(PlottingData(bins[0:-1], hod))
 
 
 
