@@ -11,7 +11,23 @@ from math import pi
 
 
 def GetCorrectFile(string, redshift, directory = "./", retz = False):
-    """ Docstring Here
+    """ Function to find the best file in a directory given a redshift.
+
+    Looking inside the directory, this function looks for file containing 
+    the supplied string, and then finds a numerical component that represents 
+    the redshift. For example, supplying "MD_" and "0.5" would first find all 
+    files with "MD_" in their name, then the one with z closest to 0.5.
+
+    Arguments:
+        string (string) : The (non-numeric) component of the filename.
+        redshift (float) : The desired redshift.
+        directory (string) : Path to the directory we want to look in. Default
+            is the current directory.
+        retz (bool) : if set to True, returns the found redshift as a second 
+            argument. Defaults to False.
+    Returns:
+        The filename as a string, and if retz = True, the redshift of the file
+        as a float.
     """
     numeric_const_pattern = '[-+]? (?: (?: \d* \. \d+ ) | (?: \d+ \.? ) )(?: [Ee] [+-]? \d+ ) ?'
     rx = re.compile(numeric_const_pattern, re.VERBOSE)
@@ -41,13 +57,26 @@ def GetCorrectFile(string, redshift, directory = "./", retz = False):
         return string_list[index]
 
 def ReadSimpleFile(string, redshift, path):
-    """ Docstring Here
+    """Function to find and read a two column CSV (normally data).
+
+    Operation is similar to GetCorrectFile, but actually reads the CSV and 
+    returns in as two columns.
+
+    Arguments:
+        string (string) : The (non-numeric) component of the filename.
+        redshift (float) : The desired redshift.
+        path (string) : Path to the directory we want to look in. Default
+            is the current directory.
+    Returns:
+        The columns of the CSV, in two parameters (A and B) as slices of
+        pandas dataframes.
     """
     file = path + GetCorrectFile(string, redshift, path)
     df = pd.read_csv(file, header = None)
     return df[0], df[1]
 
 if __name__ == "__main__":
+    # For the testing of these specific functions.
 
     directory = "./Testing/Utility/"
 

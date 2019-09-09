@@ -20,6 +20,7 @@ from Corrfunc.theory import DD
 
 # Local
 from UtillityFunctions import *
+from ImageGeneration import *
 
 class EuclidMaster:
     """Class that encapsulates the Euclid code.
@@ -35,6 +36,7 @@ class EuclidMaster:
     """
 
     def __init__(self, cosmo = 'planck18'):
+        self.cosmology_name = cosmo
         self.cosmology = cosmology.setCosmology(cosmo)
         # Extract Reduced Hubble Constant, because we use it so much
         self.h = self.cosmology.H0/100
@@ -101,38 +103,12 @@ class EuclidMaster:
         print("Found file:", file)
         data = np.load(self.bigData + file) # most of this is in h^-1 Mpc
 
-        print(data.dtype)
+        print("dypes found: ", data.dtype)
 
         # If we want to generate the Halo Mass function figure, this section.
         if generateFigures:
-            upid = data["upid"]
-            width = 0.1
-            bins = np.arange(10, 15, width)
-            hist = np.histogram(np.log10(data["mvir"][upid == -1]/self.h), bins = bins)[0]
-            volume = self.volume
-            hmf = (hist/(volume))/(width)
-            fig = plt.figure()
-            plt.plot(10**bins[0:-1], hmf, 'o', label = "Multi-Dark")
-
-            try:
-                binwidth = 0.01
-                M = 10**np.arange(10.0, 15.0, binwidth) + np.log10(self.h) # In unit's of h, for now.
-                mfunc = mass_function.massFunction(M*self.h, self.z, mdef = 'vir', model = 'tinker08', q_out = 'dndlnM')*np.log(10) *(self.h**3) #dn/dlog10M
-                #plt.plot(M, mfunc, label = "Colossus")
-            except:
-                print("Colossus Failed to plot HMF")
-            #np.savetxt("HMF.txt", np.c_[np.log10(10**bins[0:-1]), np.log10(hmf)] )
-
-            plt.xlabel("Halo Mass $M_\odot/h$")
-            plt.ylabel(r'$d\phi /d(log\;L_x)\;[Mpc^{-3}]/h$')
-            plt.title("Halo Mass function from Multidark (centrals), z = {}".format(self.z))
-            plt.loglog()
-            plt.legend()
-            # Write the file to the approprate location.
-            savePath = self.visualValidatePath + 'MultiDark_HMF.png'
-            fig.savefig(savePath)
-            plt.close()
-
+            PlotHaloMassFunction(data["mvir"][data["upid"] == -1]/self.h, self.z, self.volume, self.cosmology, self.visualValidatePath)
+        
         # Store the data in class variables, correcting for h.
 
         x_coord = data['x']/self.h
