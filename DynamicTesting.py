@@ -18,6 +18,9 @@ import Corrfunc
 from Corrfunc.theory import wp
 from Corrfunc.theory import DD
 
+# Local
+from UtillityFunctions import *
+
 class EuclidMaster:
     """Class that encapsulates the Euclid code.
 
@@ -1113,43 +1116,6 @@ class EddingtonDistributionData(data):
         prob /= binwidth # divide by binwidth
         prob = np.log10(prob[prob > 0])
         return prob
-
-
-
-def GetCorrectFile(string, redshift, directory = "./", retz = False):
-    numeric_const_pattern = '[-+]? (?: (?: \d* \. \d+ ) | (?: \d+ \.? ) )(?: [Ee] [+-]? \d+ ) ?'
-    rx = re.compile(numeric_const_pattern, re.VERBOSE)
-
-    directories = os.listdir(directory)
-
-    list = [];
-    string_list = [];
-    for file in directories: # Go through all strings (files) in the directory.
-        if string in file: # If the string is in the filename
-            stripped = file.replace(string, '') # remove the string in case we need to
-            res = rx.findall(stripped) # Find the numbers within the string.
-            if res != []:
-                list.append(float(res[0]))
-                string_list.append(file)
-
-    assert len(list) >= 1, "Files containing {} were not found".format(string)
-
-    index = (np.abs(np.array(list) - redshift)).argmin()
-
-    diff = abs(redshift - list[index])
-    if diff > 0.1:
-        print("Warning - we have requested redshift {} - Selecting file {} as it is closest".format(redshift, string_list[index]))
-    if retz:
-        return string_list[index], list[index]
-    else:
-        return string_list[index]
-
-def ReadSimpleFile(string, redshift, path):
-    file = path + GetCorrectFile(string, redshift, path)
-    df = pd.read_csv(file, header = None)
-    return df[0], df[1]
-
-
 
 if __name__ == "__main__":
     default = AssignmentVariation()
