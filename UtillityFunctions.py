@@ -56,6 +56,20 @@ def GetCorrectFile(string, redshift, directory = "./", retz = False):
     else:
         return string_list[index]
 
+def ValidatePath(path, ErrorOnFail = False):
+    """Simple function to check if a path exists, and if not create it.
+
+    Arguments:
+        path (string) : the desired path
+    Returns:
+        path (string) : just for utility
+    """
+    if not os.path.isdir(path):
+        if ErrorOnFail:
+            assert False, "{} does not exist, and most likely contains files needed for a successful run".format(path)
+        os.mkdir(path)
+    return path 
+
 def ReadSimpleFile(string, redshift, path):
     """Function to find and read a two column CSV (normally data).
 
@@ -74,6 +88,20 @@ def ReadSimpleFile(string, redshift, path):
     file = path + GetCorrectFile(string, redshift, path)
     df = pd.read_csv(file, header = None)
     return df[0], df[1]
+
+def TestForRequiredVariables(Obj, Names):
+    """Function to check that the supplied list of variables actually exist.
+
+    This is for internal use. Will throw an assertion error if names do not
+    exist.
+
+    Arguments:
+        Names (array of strings) : the names of the variables to search for.
+    """
+    for name in Names:
+        assert hasattr(Obj, name), "You need to assign {} first".format(name)
+
+
 
 if __name__ == "__main__":
     # For the testing of these specific functions.

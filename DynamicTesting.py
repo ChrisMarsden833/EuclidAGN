@@ -38,12 +38,14 @@ class EuclidMaster:
     def __init__(self, cosmo = 'planck18'):
         self.cosmology_name = cosmo
         self.cosmology = cosmology.setCosmology(cosmo)
+
         # Extract Reduced Hubble Constant, because we use it so much
         self.h = self.cosmology.H0/100
+
         # Image and data file location
-        self.visualValidatePath = "./visualValidation/"
-        self.dataPath = "./Data/"
-        self.bigData = "./BigData/"
+        self.visualValidatePath = ValidatePath("./visualValidation/")
+        self.dataPath = ValidatePath("./Data/", ErrorOnFail = True)
+        self.bigData = ValidatePath("./BigData", ErrorOnFail = True)
 
         self.XLF_plottingData = []
         self.Edd_plottingData = []
@@ -53,18 +55,6 @@ class EuclidMaster:
 
     def setRedshift(self, z = 0):
         self.z = z
-
-    def TestForRequiredVariables(self, Names):
-        """Function to check that the supplied list of variables actually exist.
-
-        This is for internal use. Will throw an assertion error if names do not
-        exist.
-
-        Arguments:
-            Names (array of strings) : the names of the variables to search for.
-        """
-        for name in Names:
-            assert hasattr(self, name), "You need to assign {} first".format(name)
 
     def DarkMatter(self, type = "MultiDark"):
         if type == "MultiDark":
@@ -201,6 +191,7 @@ class EuclidMaster:
         """
         print("Generating Semi-Analyic Haloes")
         # Preliminary tests
+        TestForRequiredVariables(self, ["z", "h"])
         self.halotype = "Analytic"
         self.volume = volume
 
@@ -281,6 +272,7 @@ class EuclidMaster:
             plt.close()
 
         self.effective_halo_mass = np.log10(masses_cataloge)
+        self.effective_z = np.zeros_like(masses_cataloge)*self.z
 
     def assignStellarMass(self, formula = "Grylls18", scatter = True, scatter_scale = 0.001, generateFigures = True):
         """Function to generate stellar masses from halo masses.
@@ -300,20 +292,15 @@ class EuclidMaster:
         """
         print("Assigning Stellar Mass")
         # Tests
-        self.TestForRequiredVariables(["effective_halo_mass", "effective_z"])
-
-        if self.halotype == "N-Body":
-            working_redshift = self.effective_z # TODO Update for only for satalites - Macc, Scale at acc, Centrals - redshift now, mass now
-        else:
-            working_redshift = self.z
+        TestForRequiredVariables(self, ["effective_halo_mass", "effective_z"])
 
         # If conditions to set the correct parameters.
         if formula == "Grylls18":
-            zparameter = np.divide(working_redshift - 0.1, working_redshift + 1)
+            zparameter = np.divide(self.effective_z - 0.1, self.effective_z + 1)
             M10, SHMnorm10, beta10, gamma10, Scatter = 11.95, 0.032, 1.61, 0.54, 0.11
             M11, SHMnorm11, beta11, gamma11 = 0.4, -0.02, -0.6, -0.1
         elif formula == "Moster":
-            zparameter = np.divide(working_redshift, working_redshift + 1)
+            zparameter = np.divide(self.effective_z, self.effective_z + 1)
             M10, SHMnorm10, beta10, gamma10 = 11.590, 0.0351, 1.376, 0.608
             M11, SHMnorm11, beta11, gamma11 = 1.195, -0.0247, -0.826, 0.329
 
@@ -372,7 +359,7 @@ class EuclidMaster:
         """
         print("Assigning Black Hole Mass")
         # Tests
-        self.TestForRequiredVariables(["z", "stellar_mass"])
+        TestForRequiredVariables(self, ["z", "stellar_mass"])
 
         if SMBH == "Francesco":
             log_Black_Hole_Mass = \
@@ -427,7 +414,7 @@ class EuclidMaster:
 
     def assignDutyCycle(self, function = "Mann"):
         print("Assigning Duty Cycle, {}".format(function))
-        self.TestForRequiredVariables(["SMBH_mass", "stellar_mass"])
+        TestForRequiredVariables(self, ["SMBH_mass", "stellar_mass"])
 
         type_cost = type(function)
         if type_cost is float or type_cost is int:
@@ -504,7 +491,7 @@ class EuclidMaster:
             else:
                 assert False, "Type is unknown"
 
-        self.TestForRequiredVariables(["SMBH_mass"])
+        TestForRequiredVariables(self, ["SMBH_mass"])
         #Ledd = 1.28e38*(10.**self.SMBH_mass)
         Ledd = 38.1072 + self.SMBH_mass
 
@@ -565,7 +552,7 @@ class EuclidMaster:
             LumLow (float) : The low limit of the luminosity cut (in log10), defaults to 42.01.
             LumHigh (float) : The high limit of the luminosity cut (in log10), defaults to 44.98
         """
-        self.TestForRequiredVariables(["dutycycle", "luminosity", "x_coord", "y_coord", "z_coord"])
+        TestForRequiredVariables(self, ["dutycycle", "luminosity", "x_coord", "y_coord", "z_coord"])
         # Random allocation
         random = np.random.rand(len(self.dutycycle))
         dutyCycleFlag = random < self.dutycycle
@@ -583,25 +570,26 @@ class EuclidMaster:
         self.lum_cat = self.luminosity[dutyCycleFlag * lum_flag]
         self.dc_cat = self.dutycycle[dutyCycleFlag * lum_flag]
 
-    def Obscuration(self, ret = "Obscured", Obscured = 23):
+    def Obscuration(self):
         print("Calculating Obscuration")
         """Function to assign column density, Nh,
 
-        Also cuts the catalogue depending on the specified value of Nh
+        Also assigns the .type variable which contains the agn type (1, 2 or 3 (3 is obscured))
 
         No attributes
         """
-        self.TestForRequiredVariables(["lum_cat"])
+        TestForRequiredVariables(self, ["luminosity"])
 
         lgNH = np.arange(20., 30., 0.0001)  # Range, or effective 'possible values' of Nh
 
-        lgNHAGNSch1 = np.ones(len(self.lum_cat))
+        lgNHAGNSch1 = np.ones(len( self.luminosity))
 
-        lgLxbin = np.arange(np.amin(self.lum_cat), np.amax(self.lum_cat), 0.01)
+        lgLxbin = np.arange(np.amin(self.luminosity), np.amax(self.luminosity), 0.01)
 
+        # This loop is super low - TODO need to speed this up.
         for i in range(len(lgLxbin)-1): # index for Lx bins
 
-            flag  = np.where((self.lum_cat >=lgLxbin[i]) & (self.lum_cat < lgLxbin[i+1])) # Boolean flag for when  arrays are lower than iterated value
+            flag  = np.where(( self.luminosity >=lgLxbin[i]) & ( self.luminosity < lgLxbin[i+1])) # Boolean flag for when  arrays are lower than iterated value
             #flag = lightningWhere(self.luminosity, lgLxbin[i], lgLxbin[i+1])
 
             fLxzNH  = (NHfunc(lgLxbin[i], self.z, lgNH))  # call fn
@@ -616,26 +604,21 @@ class EuclidMaster:
 
             lgNHAGNSch1[flag] = np.interp(a, y, lgNH, right=-99)
 
+        self.N_h = lgNHAGNSch1
+        
         N_h = lgNHAGNSch1
 
-        self.obscured = N_h > Obscured
+        type1 = np.ones_like(N_h)
+        type2 = np.ones_like(N_h) * 2
+        thick = np.ones_like(N_h) * 3
 
-        if ret == "Obscured":
-            N_h_Obscured_Flag = N_h > Obscured
-            print("    {}% of the remaining catalogue remains as obscured".format(np.round(100 * np.sum(N_h_Obscured_Flag)/len(N_h_Obscured_Flag), 2)))
-            self.x_cat = self.x_cat[N_h_Obscured_Flag]
-            self.y_cat = self.y_cat[N_h_Obscured_Flag]
-            self.z_cat = self.z_cat[N_h_Obscured_Flag]
-            self.dc_cat = self.dc_cat[N_h_Obscured_Flag]
-        elif ret == "Unobscured":
-            N_h_unobscured_Flag = N_h < Obscured
-            print("    {}% of the remaining catalogue remains as unobscured".format(np.round(100 * np.sum(N_h_unbscured_Flag)/len(N_h_unbscured_Flag), 2)))
-            self.x_cat = self.x_cat[N_h_unobscured_Flag]
-            self.y_cat = self.y_cat[N_h_unobscured_Flag]
-            self.z_cat = self.z_cat[N_h_unobscured_Flag]
-            self.dc_cat = self.dc_cat[N_h_unobscured_Flag]
-        else:
-            assert False, "Unknown argument name {}, should be Obscured or Unobscured".format(ret)
+        in_type = np.zeros_like(N_h)
+        in_type[N_h < 22] = type1[N_h < 22]
+        in_type[(N_h >= 22)*(N_h < 24)] = type2[[(N_h >= 22)*(N_h < 24)]]
+        in_type[N_h >= 24] = thick[N_h >= 24]
+
+        self.type = in_type
+
 
     def computeWP(self, threads = "System", pi_max = 50, binStart = -1, binStop = 1.5, binSteps = 50):
         print("Computing wp")
@@ -649,7 +632,7 @@ class EuclidMaster:
             binStop (float) : High limit to the (log spaced) bins. Defaults t0 1.5
             binSteps (int) : The number of spaces in the bins. Defaults to 50
         """
-        self.TestForRequiredVariables(["x_cat", "y_cat", "z_cat", "lum_cat"])
+        TestForRequiredVariables(self, ["x_cat", "y_cat", "z_cat", "lum_cat"])
         if threads == "System":
             threads = multiprocessing.cpu_count()
         period = self.volume**(1/3)
@@ -666,7 +649,7 @@ class EuclidMaster:
         requiredVariables = ["parent_halo_mass"]
         if weight:
             requiredVariables.append("dutycycle")
-        self.TestForRequiredVariables(requiredVariables)
+        TestForRequiredVariables(self, requiredVariables)
 
         def func_g_squared(z):
             matter = self.cosmology.Om0*(1+z)**3
@@ -964,7 +947,7 @@ class XLF_Data(data):
         """
         L = bins
         z = self.z
-        h = self.h
+
         # Constants
         A = 2.91e-6
         L_s = 43.97
@@ -1094,12 +1077,12 @@ class EddingtonDistributionData(data):
         return prob
 
 if __name__ == "__main__":
-    default = AssignmentVariation()
+    default = EuclidMaster()
     default.setRedshift(1.5)
     default.generateSemiAnalyticHaloes(volume = 250**3)
     default.assignStellarMass()
     default.assignBlackHoleMass()
+    default.assignDutyCycle(0.1)
     default.assignEddingtonRatios()
-    default.assignDutyCycle(function = "Constant")
-    a, b = default.getLuminosityFunction()
-    c, d = default.getEddingtonDistribution()
+    default.Obscuration()
+
