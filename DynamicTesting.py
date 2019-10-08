@@ -10,6 +10,7 @@ import re
 import multiprocessing
 from numba import jit
 from math import pi
+import time
 
 # Specific Libraries
 from colossus.cosmology import cosmology
@@ -45,7 +46,7 @@ class EuclidMaster:
         # Image and data file location
         self.visualValidatePath = ValidatePath("./visualValidation/")
         self.dataPath = ValidatePath("./Data/", ErrorOnFail = True)
-        self.bigData = ValidatePath("./BigData", ErrorOnFail = True)
+        self.bigData = ValidatePath("./BigData/", ErrorOnFail = True)
 
         self.XLF_plottingData = []
         self.Edd_plottingData = []
@@ -171,7 +172,7 @@ class EuclidMaster:
         self.parent_halo_mass = np.log10(mvir_par)
         self.upid = upid
 
-    def generateSemiAnalyticHaloes(self, volume = 500, mass_low = 12., mass_high = 16., generateFigures = True):
+    def generateSemiAnalyticHaloes(self, volume = 500**3, mass_low = 12., mass_high = 16., generateFigures = True):
         """Function to generate a cataloge of Semi-Analyic Haloes.
 
         Function to pull a catalogue of haloes from the halo mass function. A
@@ -492,6 +493,7 @@ class EuclidMaster:
                 assert False, "Type is unknown"
 
         TestForRequiredVariables(self, ["SMBH_mass"])
+
         #Ledd = 1.28e38*(10.**self.SMBH_mass)
         Ledd = 38.1072 + self.SMBH_mass
 
@@ -578,6 +580,7 @@ class EuclidMaster:
 
         No attributes
         """
+
         TestForRequiredVariables(self, ["luminosity"])
 
         lgNH = np.arange(20., 30., 0.0001)  # Range, or effective 'possible values' of Nh
@@ -586,23 +589,46 @@ class EuclidMaster:
 
         lgLxbin = np.arange(np.amin(self.luminosity), np.amax(self.luminosity), 0.01)
 
-        # This loop is super low - TODO need to speed this up.
+        bin_indexes = np.digitize(self.luminosity, lgLxbin)
+
+        def GenerateNHValue(i, length, lgNH = lgNH):
+            fLxzNH = (NHfunc(lgLxbin[i], self.z, lgNH))  # call fn
+            fLxzNH = fLxzNH * 0.01
+            fLxzNH_ = fLxzNH[::-1]  # reverse
+            fLxzNH_cum = np.cumsum(fLxzNH_)  # cumulative sum
+            r_fLxzNH_cum = fLxzNH_cum[::-1]  # Reverse again
+            y = r_fLxzNH_cum / r_fLxzNH_cum[0]  # Normalize(ish?) by the first element
+            y = y[::-1]  # Reverse AGAIN
+            lgNH2 = lgNH[::-1]  # Reverse
+            a = np.random.random(length)
+            return np.interp(a, y, lgNH2, right=-99)
+
+        flagger = 0
+        NHer = 0
+
+        start = time.process_time()
+
+        # This loop is super slow - TODO need to speed this up.
         for i in range(len(lgLxbin)-1): # index for Lx bins
 
-            flag  = np.where(( self.luminosity >=lgLxbin[i]) & ( self.luminosity < lgLxbin[i+1])) # Boolean flag for when  arrays are lower than iterated value
-            #flag = lightningWhere(self.luminosity, lgLxbin[i], lgLxbin[i+1])
+            flag_start = time.process_time()
 
-            fLxzNH  = (NHfunc(lgLxbin[i], self.z, lgNH))  # call fn
-            fLxzNH = fLxzNH * 0.01
-            fLxzNH_= fLxzNH[::-1] # reverse
-            fLxzNH_cum = np.cumsum(fLxzNH_) # cumulative sum
-            r_fLxzNH_cum  = fLxzNH_cum[::-1] # Reverse again
-            y = r_fLxzNH_cum/ r_fLxzNH_cum[0] # Normalize(ish?) by the first element
-            y = y[::-1]  # Reverse AGAIN
-            lgNH = lgNH[::-1] # R
-            a = np.random.random()
+            flag = (bin_indexes == i)
 
-            lgNHAGNSch1[flag] = np.interp(a, y, lgNH, right=-99)
+            flag_stop = time.process_time()
+
+            flagger += abs(flag_start - flag_stop)
+
+            lgNHAGNSch1[flag] = GenerateNHValue(i, len(lgNHAGNSch1[flag]))
+
+            NHstop = time.process_time()
+
+            NHer += abs(flag_stop - NHstop)
+
+        print(time.process_time() - start)
+
+        print("Flag:", flagger)
+        print("NHer:", NHer)
 
         self.N_h = lgNHAGNSch1
         
@@ -1078,8 +1104,8 @@ class EddingtonDistributionData(data):
 
 if __name__ == "__main__":
     default = EuclidMaster()
-    default.setRedshift(1.5)
-    default.generateSemiAnalyticHaloes(volume = 250**3)
+    default.setRedshift(0.1)
+    default.generateSemiAnalyticHaloes(volume=1000**3)
     default.assignStellarMass()
     default.assignBlackHoleMass()
     default.assignDutyCycle(0.1)
