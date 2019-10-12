@@ -20,23 +20,25 @@ from Corrfunc.theory import wp
 from Corrfunc.theory import DD
 
 # Local
-from UtillityFunctions import *
+import galaxy_physics as gp
+from Utillity import *
 from ImageGeneration import *
+
 
 class EuclidMaster:
     """Class that encapsulates the Euclid code.
 
     This object should be created, and then it's member functions should be
-    called in the approprate order with varying parameters where desired. The
+    called in the appropriate order with varying parameters where desired. The
     'getter' functions can then be used to extract relavant data.
 
     Attributes:
         cosmo (string): A string describing the cosmology the class will use.
             The default is planck18. This is passed straight to
-            colossus.cosmology, so define as approprate.
+            colossus.cosmology, so define as appropriate.
     """
 
-    def __init__(self, cosmo = 'planck18'):
+    def __init__(self, cosmo='planck18'):
         self.cosmology_name = cosmo
         self.cosmology = cosmology.setCosmology(cosmo)
 
@@ -44,9 +46,18 @@ class EuclidMaster:
         self.h = self.cosmology.H0/100
 
         # Image and data file location
-        self.visualValidatePath = ValidatePath("./visualValidation/")
-        self.dataPath = ValidatePath("./Data/", ErrorOnFail = True)
-        self.bigData = ValidatePath("./BigData/", ErrorOnFail = True)
+        self.path_visual_validation = ValidatePath("./visualValidation/")
+        self.path_data = ValidatePath("./Data/", ErrorOnFail=True)
+        self.path_bigData = ValidatePath("./BigData/", ErrorOnFail=True)
+
+        # Initialization (not strictly necessary but for PEP8 compliance...
+        self.z = 0
+        self.dm_type = 'Undefined'
+        self.volume_axis = 0
+        self.volume = 0
+
+        # Primary Catalog
+        self.main_catalog = []
 
         self.XLF_plottingData = []
         self.Edd_plottingData = []
@@ -54,291 +65,177 @@ class EuclidMaster:
         self.bias_plottingData = []
         self.HOD_plottingData = []
 
-    def setRedshift(self, z = 0):
+        self.process_bookkeeping = {
+            "Dark Matter": False,
+            "Stellar Mass": False,
+            "Black Hole Mass": False,
+            "Eddington Ratios": False,
+            "Duty Cycle": False}
+
+    def set_z(self, z=0.):
         self.z = z
 
-    def DarkMatter(self, type = "MultiDark"):
-        if type == "MultiDark":
-            self.loadMultiDarkHaloes() # TODO put these arguments into a parameter file.
-        elif type == "Analytic":
-            self.generateSemiAnalyticHaloes()
-        else:
-            assert False, "Unknown DarkMatter type {}".format(type)
+    def define_main_catalog(self, length):
+        dt = [("x", np.float32),
+              ("y", np.float32),
+              ("z", np.float32),
+              ("effective_halo_mass", np.float32),
+              ("effective_z", np.float32),
+              ("stellar_mass", np.float32)]
+        self.main_catalog = np.zeros(length, dtype=dt)
+        self.main_catalog['effective_z'] = np.ones(length) * self.z
 
-    def loadMultiDarkHaloes(self, generateFigures = True, filename = "MD_" ):
-        """ Function to load in the data from the multidark halo catalogue
+    def load_dm_catalogue(self, generate_figures=True, filename="MD_"):
+        """ Function to load in the catalog_data from the multi-dark halo catalogue
 
-        This data should exist as .npy files in the Directory/BigData. Within
+        This catalog_data should exist as .npy files in the Directory/BigData. Within
         this folder there should be a script to pull these out of the SQL
         database. Note that this expects a .npy file in the with columns x, y, z
         scale factor at accretion, mass at accretion. If generateFigures is set
         to True (default), then a further column of the halo mass is also
-        required to validate the haloes.
+        required to validate the halos.
 
         Attributes:
-            generateFigures (bool) : flag to generate the figures that exist for
+            generate_figures (bool) : flag to generate the figures that exist for
                 visual validation. Defaults to true.
-            data_directory (string) : relative path to the directory containing
-                the data. Defaults to ./BigData
             filename (string) : component of the filename excluding the redshift
                 - the closest z will be found automatically. Default is "MD_",
                 expecting files of the form "MD_0.0.npy".
         """
-        print("Loading MultiDark Haloes")
-        self.halotype = "N-Body" # Flag used for later
-        self.axis = 1000/self.h
-        self.volume = (self.axis)**3 # MultiDark Box size, Mpc
+        print("Loading Halo Catalogue")
+        self.dm_type = "N-Body"  # Flag used for later
+        self.volume_axis = 1000 / self.h
+        self.volume = self.volume_axis**3  # MultiDark Box size, Mpc
 
         # Search for the closest file and read it in.
-        file, retz = GetCorrectFile(filename, self.z, directory = self.bigData, retz = True)
-        print("Found file:", file)
-        data = np.load(self.bigData + file) # most of this is in h^-1 Mpc
+        catalog_file, catalog_z = GetCorrectFile(filename, self.z, self.path_bigData, True)
+        print("Found file:", catalog_file)
+        catalog_data = np.load(self.path_bigData + catalog_file)
+        print("dtypes found: ", catalog_data.dtype)
 
-        print("dypes found: ", data.dtype)
+        self.define_main_catalog(len(catalog_data))
 
         # If we want to generate the Halo Mass function figure, this section.
-        if generateFigures:
-            PlotHaloMassFunction(data["mvir"][data["upid"] == -1]/self.h, self.z, self.volume, self.cosmology, self.visualValidatePath)
+        if generate_figures:
+            PlotHaloMassFunction(catalog_data["mvir"][catalog_data["upid"] == -1] / self.h, self.z, self.volume,
+                                 self.cosmology, self.path_visual_validation)
         
-        # Store the data in class variables, correcting for h.
+        # Store the catalog_data in class variable, correcting for h.
+        self.main_catalog['x'] = catalog_data['x']/self.h
+        self.main_catalog['y'] = catalog_data['y']/self.h
+        self.main_catalog['z'] = catalog_data['z']/self.h
 
-        x_coord = data['x']/self.h
-        y_coord = data['y']/self.h
-        z_coord = data['z']/self.h
-        id = data["id"]
-        upid = data["upid"]
-        mvir = data["mvir"]/self.h
-        macc = data["Macc"]/self.h
-        aacc = data["Acc_Scale"]
+        # These things don't need to go into the class (yet), as we're about to use them.
+        main_id = catalog_data["id"]
+        up_id = catalog_data["upid"]
+        virial_mass = catalog_data["mvir"]/self.h
+        mass_at_accretion = catalog_data["Macc"]/self.h
+        accretion_scale = catalog_data["Acc_Scale"]
 
-        del data # Save on memory
+        del catalog_data  # Save on memory
 
-        # Reserved mem
-        mvir_par = np.zeros_like(mvir)
-        idh = np.zeros_like(mvir)
-        effective_z = np.zeros_like(aacc)
+        # Reserved memory
+        virial_mass_parent = np.zeros_like(virial_mass)
+        idh = np.zeros_like(virial_mass)
+        effective_z = np.zeros_like(accretion_scale)
 
-        print('    sorting list w.r.t. upId')
-        inds = upid.argsort() # + 1 Array, rest are reused
-        x_coord = x_coord[inds]
-        y_coord = y_coord[inds]
-        z_coord = z_coord[inds]
-        id = id[inds]
-        upid = upid[inds]
-        mvir = mvir[inds]
-        macc = macc[inds]
-        aacc = aacc[inds]
-        upid0 = np.searchsorted(upid, 0) # Position where zero should sit on the now sorted upid.
-        # All arrays are now sorted by upid
+        print('    Sorting list w.r.t. upId')
+        sorted_indexes = up_id.argsort()  # + 1 Array, rest are reused
+        # To maintain order, we update the class data. This only needs to be done once.
+        self.main_catalog['x'] = self.main_catalog['x'][sorted_indexes]
+        self.main_catalog['y'] = self.main_catalog['y'][sorted_indexes]
+        self.main_catalog['z'] = self.main_catalog['z'][sorted_indexes]
+        # We also do this with the local data
+        main_id = main_id[sorted_indexes]
+        up_id = up_id[sorted_indexes]
+        virial_mass = virial_mass[sorted_indexes]
+        mass_at_accretion = mass_at_accretion[sorted_indexes]
+        accretion_scale = accretion_scale[sorted_indexes]
+        up_id_0 = np.searchsorted(up_id, 0)  # Position where zero should sit on the now sorted up_id.
+        # All arrays are should now sorted by up_id.
 
-        print('    copying all ', str(upid0), 'elements with upid = -1')
-        mvir_par[:upid0] = mvir[:upid0] # MVir of centrals, or where upid  = -1, so just the mass.
-        #idh[:upid0] = 0 # Does nothing?
+        print('    copying all {} elements with up_id = -1'.format(str(up_id_0)))
+        virial_mass_parent[:up_id_0] = virial_mass[:up_id_0]  # MVir of centrals, or where up_id  = -1.
 
-        print('    sorting remaining list list w.r.t. rockstarId')
-        upid_cut = upid[upid0:] # Upids that are not -1, or the satalites, with a value pointing to their progenitor.
+        print('    sorting remaining list list w.r.t. main id')
+        up_id_cut = up_id[up_id_0:]  # Up_id's that are not -1, or the satellites, value pointing to their progenitor.
 
-        id_cut = id[:upid0] # ids of centrals
-        mvir_cut = mvir[:upid0] # masses of centrals
+        id_cut = main_id[:up_id_0]  # ids of centrals
+        virial_mass_cut = virial_mass[:up_id_0]  # masses of centrals
 
-        inds = id_cut.argsort() # get indexes to centrals by id.
-        id_cut = id_cut[inds] # actually sort centrals by id.
-        mvir_cut = mvir_cut[inds] # sort virial masses the same way.
+        sorted_indexes = id_cut.argsort()  # get indexes to centrals by id.
+        id_cut = id_cut[sorted_indexes]  # actually sort centrals by id.
+        virial_mass_cut = virial_mass_cut[sorted_indexes]  # sort virial masses the same way.
 
-        print('    copying remaining', str(len(upid) - upid0), 'elements')
-        inds = np.searchsorted(id_cut, upid_cut) # indexes of where satalite id's point to centrals
-        mvir_par[upid0:] = mvir_cut[inds] # Sort mvir_par by this, and assign it to the sat part of mvir_par
-        # This gives us the virial mass of the parent or itself if it is a parent. But do we acutally need this?
-        idh[upid0:] = 1
+        print('    copying remaining', str(len(up_id) - up_id_0), 'elements')
+        sorted_indexes = np.searchsorted(id_cut, up_id_cut)  # indexes of where satellite id's point to centrals
+        virial_mass_parent[up_id_0:] = virial_mass_cut[sorted_indexes]  # Sort parents by this, and assign to satellites
+        # This gives us the virial mass of the parent or itself if it is a parent. But do we actually need this?
+        idh[up_id_0:] = 1
 
-        halo_mass = mvir
-        halo_mass[idh > 0] = macc[idh > 0]
+        halo_mass = virial_mass
+        halo_mass[idh > 0] = mass_at_accretion[idh > 0]
 
-        effective_z[idh > 0] = 1/aacc[idh > 0] - 1
-        effective_z[idh < 1] = retz
+        effective_z[idh > 0] = 1/accretion_scale[idh > 0] - 1
+        effective_z[idh < 1] = catalog_z
 
-        #flagsat = np.where(idh > 0)
-        #flagcen = np.where(idh < 1)
+        # self.main_catalog['virial_mass'] = virial_mass # Not sure we actually need this?
 
-        #self.Mvir = data["Mvir"]/self.h
-        #self.First_Acc_Mvir = data["First_Acc_Mvir"]/self.h
+        self.main_catalog['effective_halo_mass'] = np.log10(halo_mass)
+        self.main_catalog['effective_z'] = effective_z
+        # self.main_catalog['parent_halo_mass'] = np.log10(virial_mass_parent)
+        # self.main_catalog['up_id'] = up_id
 
-        self.x_coord = x_coord
-        self.y_coord = y_coord
-        self.z_coord = z_coord
-        self.mvir = mvir
-        self.effective_halo_mass = np.log10(halo_mass)
-        self.effective_z = effective_z
-        self.parent_halo_mass = np.log10(mvir_par)
-        self.upid = upid
+    def generate_semi_analytic_halos(self, volume=500**3, mass_low=12., mass_high=16., generate_figures=True):
+        """Function to generate a catalog of semi-analytic halos.
 
-    def generateSemiAnalyticHaloes(self, volume = 500**3, mass_low = 12., mass_high = 16., generateFigures = True):
-        """Function to generate a cataloge of Semi-Analyic Haloes.
-
-        Function to pull a catalogue of haloes from the halo mass function. A
+        Function to pull a catalogue of halos from the halo mass function. A
         reasonable volume should be chosen - a larger volume will of course
-        produce a greater number of haloes, which will increase resolution at
+        produce a greater number of halos, which will increase resolution at
         additional computational expense.
 
         Attributes:
             volume (float) : The volume of the region within which we will
-                create the haloes.
+                create the halos.
             mass_low (float) : The lowest mass (in log10 M_sun) halo to generate
                 defaulting to 11.
             mass_high (float) : The highest mass halo to generate, defaulting to
                 15
-            generateFigures (bool) : flag to generate the figures that exist for
+            generate_figures (bool) : flag to generate the figures that exist for
                 visual validation. Defaults to true.
         """
-        print("Generating Semi-Analyic Haloes")
-        # Preliminary tests
-        TestForRequiredVariables(self, ["z", "h"])
-        self.halotype = "Analytic"
+        print("Generating Semi-Analytic halos")
+
+        self.dm_type = "Analytic"
         self.volume = volume
 
-        # Create HMF
-        binwidth = 0.1 # Well defined binwidth is vital for this process.
-        # First we define a possible 'mass range'
-        M = 10**np.arange(mass_low, mass_high, binwidth) + np.log10(self.h) # In unit's of h
-        # Using it, we then generate a mass function using colossus. Unit corrections kindly suppled by Lorenzo.
-        mfunc = mass_function.massFunction(M, self.z, mdef = '200m', model = 'tinker08', q_out = 'dndlnM') * np.log(10)/self.h  # dn/dlog10M
+        temporary_halos = \
+            gp.generate_semi_analytic_halo_catalogue(200 ** 3, (mass_low, mass_high, 0.1), self.z, self.h,
+                                                     visual_debugging=False,
+                                                     path="./visualValidation/SemiAnalyticCatalog/")
 
-        # Plot the halo mass function generated by colossus.
-        if generateFigures:
-            fig = plt.figure()
-            plt.xlabel('M200m')
-            plt.ylabel('M')
-            plt.title('Halo Mass function from Colossus')
-            plt.loglog()
-            plt.plot(M, mfunc, '-', label = 'z = %.1f' % self.z)
-            plt.legend()
-            savePath = self.visualValidatePath + 'Colossus_HMF.png'
-            fig.savefig(savePath)
-            plt.close()
+        self.define_main_catalog(len(temporary_halos))
+        self.main_catalog['effective_halo_mass'] = temporary_halos
 
-        # We determine the Cumulative HMF starting from the high mass end, multipled by the bin width.
-        # This effectively gives the cumulative probabiliy of a halo existing.
-        cum_mfunc = np.flip(np.cumsum(np.flip(mfunc, 0)), 0) * binwidth
+        #self.effective_z = np.zeros_like(masses_cataloge)*self.z
 
-        ########################################################################
-        # Interpolation Tests
-        # Interpolator for the testing - we will update this with the volume in a second.
-        # This is essenially for a volume of size unity.
-        interpolator = sp.interpolate.interp1d(cum_mfunc, M)
+    def assignStellarMass(self, formula="Grylls18", scatter=0.001):
+        """ Function to generate stellar masses from halo masses
 
-        sample_index = int(np.floor(len(cum_mfunc)/2)) # index of the half way point in the cumulative function.
-        num_test = cum_mfunc[sample_index] # The value of the cum function at this index
-        mass_test = interpolator(num_test) # Interpolate to get the mass that this predicts
-        # Check that these values are equivilant.
-        assert M[sample_index] == mass_test, "Interpolation method incorrect: Back interpolation at midpoint failed"
-        # Check first element is equivilant to the total (it obviously must be, but it's worth checking)- to 10 SF accuracy
-        accuracy = 10
-        assert np.round(cum_mfunc[0], accuracy) == np.round(np.sum(mfunc) * binwidth, accuracy), "Final Cumsum element != total sum"
-        ########################################################################
+        Just calls the 'class free' function from galaxy_physics
 
-        # Multiply by volume.
-        cum_mfunc = cum_mfunc * volume
-
-        # Get the maximum cumulative number.
-        max_number = np.floor(cum_mfunc[0])
-        range_numbers = np.arange(max_number)
-
-        # Update interpolator
-        interpolator = sp.interpolate.interp1d(cum_mfunc, M)
-        masses_cataloge = interpolator(range_numbers[range_numbers >= np.amin(cum_mfunc)])
-
-        # Reconstruct HMF
-        width = 0.1
-        bins = np.arange(10, 16, width)
-        hist = np.histogram(np.log10(masses_cataloge), bins=bins)[0]
-        hmf = (hist/(volume))/width
-
-        # Plot both as a comparison
-        if generateFigures:
-            # Plot both as a comparison
-            plt.figure()
-            plt.loglog()
-
-            bins_power = 10**(bins[0:-1])
-
-            plt.plot(bins_power[hmf != 0], hmf[hmf != 0], 'o', label = 'Reconstructed')
-
-            plt.plot(M, mfunc, label = 'Original');
-            plt.legend()
-            plt.xlabel("Halo Mass")
-            plt.ylabel("Number Density")
-            plt.title("Reconstruncted HMF")
-            savePath = self.visualValidatePath + 'HMF_Validation.png'
-            plt.savefig(savePath)
-            plt.close()
-
-        self.effective_halo_mass = np.log10(masses_cataloge)
-        self.effective_z = np.zeros_like(masses_cataloge)*self.z
-
-    def assignStellarMass(self, formula = "Grylls18", scatter = True, scatter_scale = 0.001, generateFigures = True):
-        """Function to generate stellar masses from halo masses.
-
-        This is based on Grylls 2018, but also has the option to use the
-        parameters from Moster. This is a simplified version of Pip's
-        DarkMatterToStellarMass() function.
-
-        Attributes:
-            formula (string) : The prescription to use. This defaults to
-                "Grylls18", and can also be set to "Moster"
-            scatter (bool) : flag to switch on the scatter. Defaults to True.
-            scatter_scale (float): the scale of the scatter (not in log10).
-                Defaults to 0.001.
-            generateFigures (bool) : flag to generate the figures that exist for
-                visual validation. Defaults to true.
+        :param formula: string,
+        :param scatter:
+        :return:
         """
         print("Assigning Stellar Mass")
-        # Tests
-        TestForRequiredVariables(self, ["effective_halo_mass", "effective_z"])
-
-        # If conditions to set the correct parameters.
-        if formula == "Grylls18":
-            zparameter = np.divide(self.effective_z - 0.1, self.effective_z + 1)
-            M10, SHMnorm10, beta10, gamma10, Scatter = 11.95, 0.032, 1.61, 0.54, 0.11
-            M11, SHMnorm11, beta11, gamma11 = 0.4, -0.02, -0.6, -0.1
-        elif formula == "Moster":
-            zparameter = np.divide(self.effective_z, self.effective_z + 1)
-            M10, SHMnorm10, beta10, gamma10 = 11.590, 0.0351, 1.376, 0.608
-            M11, SHMnorm11, beta11, gamma11 = 1.195, -0.0247, -0.826, 0.329
-
-        # Create full parameters
-        M = M10 + M11*zparameter
-        N = SHMnorm10 + SHMnorm11*zparameter
-        b = beta10 + beta11*zparameter
-        g = gamma10 + gamma11*zparameter
-        # Full formula
-        #DM = self.effective_halo_mass
-        SM = np.log10(np.power(10, self.effective_halo_mass) * (2*N*np.power( (np.power(np.power(10,self.effective_halo_mass-M), -b) + np.power(np.power(10,self.effective_halo_mass-M), g)), -1)))
-        del self.effective_halo_mass
-        # Add scatter, if requested.
-        if scatter:
-            SM += np.random.normal(scale = scatter_scale, size = np.shape(SM))
-        # Assign Stellar Mass to the class.
-        self.stellar_mass = SM
-        # Generate the figures, if requested.
-        if generateFigures:
-            width = 0.1
-            bins = np.arange(9, 15, width)
-
-            hist = np.histogram(self.stellar_mass, bins = bins)[0]
-            hmf = (hist/(self.volume))/width
-            log_smf = np.log10(hmf[hmf != 0])
-            adj_bins = bins[0:-1][hmf != 0]
-
-            plt.figure()
-            plt.loglog()
-            plt.plot(10**adj_bins, (10**log_smf), label = "Grylls 2019")
-            plt.xlabel("Stellar Mass")
-            plt.ylabel("phi")
-            plt.title("Stellar Mass Function, assigned from Pip's code")
-            plt.legend()
-            savePath = self.visualValidatePath + 'SMF_Validation.png'
-            plt.savefig(savePath)
-            plt.close()
+        self.main_catalog['stellar_mass'] = gp.halo_mass_to_stellar_mass(self.main_catalog['effective_halo_mass'],
+                                                                         self.main_catalog['effective_z'],
+                                                                         formula=formula,
+                                                                         scatter=scatter,
+                                                                         visual_debugging=False,
+                                                                         debugging_volume=self.volume,
+                                                                         path="./visualValidation/StellarMass/")
 
     def assignBlackHoleMass(self, SMBH = "Francesco", scatter = "intrinsic", scatter_magnitude = 0.6, generateFigures = True):
         """Function to assign black hole mass from Stellar Mass
@@ -380,7 +277,7 @@ class EuclidMaster:
                 scatter = np.random.normal(0, scatter_magnitude, len(self.stellar_mass))
                 log_Black_Hole_Mass += scatter
         elif SMBH == 'Eq4':
-            log_Black_Hole_Mass =  8.35 + 1.31 * (Stellar_Mass - 11)
+            log_Black_Hole_Mass =  8.35 + 1.31 * (self.stellar_mass - 11)
             if scatter == "intrinsic":
                 print("Warning - Eq4's intrinsic scatter is effectively fixed, with a scale of 0.5")
                 scatter = np.random.normal(0, 0.5, len(self.stellar_mass))
@@ -409,7 +306,7 @@ class EuclidMaster:
             plt.ylabel("phi")
             plt.title("Black Hole Mass Function")
             plt.legend()
-            savePath = self.visualValidatePath + 'BHMF_Validation.png'
+            savePath = self.path_visual_validation + 'BHMF_Validation.png'
             plt.savefig(savePath)
             plt.close()
 
@@ -425,7 +322,7 @@ class EuclidMaster:
             if function == "Mann":
                 if self.z > 0.1:
                     print("Warning - Mann's duty cycle is not set up for redshifts other than zero")
-                Mann_path = self.dataPath + "Mann.csv"
+                Mann_path = self.path_data + "Mann.csv"
                 df = pd.read_csv(Mann_path, header = None)
                 SM = df[0]
                 U = df[1]
@@ -439,7 +336,7 @@ class EuclidMaster:
 
             elif function == "Schulze":
                 # Find the nearest file to the redshift we want
-                schulzePath = self.dataPath + GetCorrectFile("Schulze", self.z, self.dataPath)
+                schulzePath = self.path_data + GetCorrectFile("Schulze", self.z, self.path_data)
                 df = pd.read_csv(schulzePath, header = None)
                 Data_BH = df[0]
                 Data_DC = df[1]
@@ -603,32 +500,35 @@ class EuclidMaster:
             a = np.random.random(length)
             return np.interp(a, y, lgNH2, right=-99)
 
-        flagger = 0
-        NHer = 0
+        #flagger = 0
+        #NHer = 0
 
-        start = time.process_time()
+        #start = time.process_time()
 
         # This loop is super slow - TODO need to speed this up.
         for i in range(len(lgLxbin)-1): # index for Lx bins
 
-            flag_start = time.process_time()
+            #flag_start = time.process_time()
+            ######################################
+            flag = np.where(bin_indexes == i)
+            ######################################
+            #flag_stop = time.process_time()
 
-            flag = (bin_indexes == i)
+            #flagger += abs(flag_start - flag_stop)
 
-            flag_stop = time.process_time()
+            #NhStart = time.process_time()
 
-            flagger += abs(flag_start - flag_stop)
-
+            ######################################
             lgNHAGNSch1[flag] = GenerateNHValue(i, len(lgNHAGNSch1[flag]))
+            ######################################
+            #NHstop = time.process_time()
 
-            NHstop = time.process_time()
+            #NHer += abs(NhStart - NHstop)
 
-            NHer += abs(flag_stop - NHstop)
+        #print(time.process_time() - start)
 
-        print(time.process_time() - start)
-
-        print("Flag:", flagger)
-        print("NHer:", NHer)
+        #print("Flag:", flagger)
+        #print("NHer:", NHer)
 
         self.N_h = lgNHAGNSch1
         
@@ -658,14 +558,14 @@ class EuclidMaster:
             binStop (float) : High limit to the (log spaced) bins. Defaults t0 1.5
             binSteps (int) : The number of spaces in the bins. Defaults to 50
         """
-        TestForRequiredVariables(self, ["x_cat", "y_cat", "z_cat", "lum_cat"])
+        TestForRequiredVariables(self, ["x_coord", "y_coord", "z_coord", "lum_cat", "dutycycle"])
         if threads == "System":
             threads = multiprocessing.cpu_count()
         period = self.volume**(1/3)
         rbins = np.logspace(-1, 1.5, 50)
         self.wpbins = rbins
         wp_results = wp(period, pi_max, threads, rbins,\
-                self.x_cat, self.y_cat, self.z_cat, weights = self.dc_cat, weight_type = 'pair_product', verbose = True)
+                self.x_coord, self.y_coord, self.z_coord, weights = self.dutycycle, weight_type = 'pair_product', verbose = True)
         xi = wp_results['wp']
 
         self.WP_plottingData.append(PlottingData(rbins[:-1], xi))
@@ -797,7 +697,7 @@ class EuclidMaster:
             return func_b_eulTin(nu, delta_0_crit)
 
         g_squared = func_g_squared(self.z)
-        bias = estimate_biasTin(((10.**self.parent_halo_mass)*0.974)*self.h, 0.25, g_squared) # So this is the bias of the haloes?
+        bias = estimate_biasTin(((10.**self.parent_halo_mass)*0.974)*self.h, self.z, g_squared) # So this is the bias of the haloes?
 
         bin = np.arange(np.amin(variable), np.amax(variable), binsize)
         meanbias = np.zeros_like(bin)
@@ -815,7 +715,6 @@ class EuclidMaster:
                 errorbias[i] = np.std(bias[N1])
 
         self.bias_plottingData.append(PlottingData(bin[0:-1], meanbias[0:-1], errorbias[0:-1]))
-
 
     def CalculateHOD(self, Centrals = True, weights = True):
         """Docstring
@@ -859,6 +758,15 @@ class EuclidMaster:
 
         self.HOD_plottingData.append(PlottingData(bins[0:-1], hod))
 
+    def listAttributes(self):
+        attributes = [attr for attr in dir(self)
+                      if not callable(getattr(self, attr))
+                      and not attr.startswith("__")
+                      and len(attr) > 1]
+        for attr in attributes:
+            print(attr, type(attr))
+
+        print(attributes)
 
 
 def Aird_edd_dist(edd, z):
@@ -1104,11 +1012,14 @@ class EddingtonDistributionData(data):
 
 if __name__ == "__main__":
     default = EuclidMaster()
-    default.setRedshift(0.1)
-    default.generateSemiAnalyticHaloes(volume=1000**3)
+    default.set_z(0.1)
+    default.generate_semi_analytic_halos(volume=1000 ** 3)
+    default.assignStellarMass()
+    """
     default.assignStellarMass()
     default.assignBlackHoleMass()
     default.assignDutyCycle(0.1)
     default.assignEddingtonRatios()
     default.Obscuration()
-
+    default.listAttributes()
+    """

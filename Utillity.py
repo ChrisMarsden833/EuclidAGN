@@ -4,13 +4,15 @@ from scipy import stats
 from scipy import special
 import pandas as pd
 import os
+import glob
 import re
+import sys
 import multiprocessing
 from numba import jit
 from math import pi
 
 
-def GetCorrectFile(string, redshift, directory = "./", retz = False):
+def GetCorrectFile(string, redshift, directory_path ="./", retz = False):
     """ Function to find the best file in a directory given a redshift.
 
     Looking inside the directory, this function looks for file containing 
@@ -21,7 +23,7 @@ def GetCorrectFile(string, redshift, directory = "./", retz = False):
     Arguments:
         string (string) : The (non-numeric) component of the filename.
         redshift (float) : The desired redshift.
-        directory (string) : Path to the directory we want to look in. Default
+        directory_path (string) : Path to the directory we want to look in. Default
             is the current directory.
         retz (bool) : if set to True, returns the found redshift as a second 
             argument. Defaults to False.
@@ -32,7 +34,7 @@ def GetCorrectFile(string, redshift, directory = "./", retz = False):
     numeric_const_pattern = '[-+]? (?: (?: \d* \. \d+ ) | (?: \d+ \.? ) )(?: [Ee] [+-]? \d+ ) ?'
     rx = re.compile(numeric_const_pattern, re.VERBOSE)
 
-    directories = os.listdir(directory)
+    directories = os.listdir(directory_path)
 
     list = []
     string_list = []
@@ -101,6 +103,54 @@ def TestForRequiredVariables(Obj, Names):
     for name in Names:
         assert hasattr(Obj, name), "You need to assign {} first".format(name)
 
+def query_yes_no(question, default="yes"):
+    """Ask a yes/no question via raw_input() and return their answer.
+
+    "question" is a string that is presented to the user.
+    "default" is the presumed answer if the user just hits <Enter>.
+        It must be "yes" (the default), "no" or None (meaning
+        an answer is required of the user).
+
+    The "answer" return value is True for "yes" or False for "no".
+    """
+    valid = {"yes": True, "y": True, "ye": True,
+             "no": False, "n": False}
+    if default is None:
+        prompt = " [y/n] "
+    elif default == "yes":
+        prompt = " [Y/n] "
+    elif default == "no":
+        prompt = " [y/N] "
+    else:
+        raise ValueError("invalid default answer: '%s'" % default)
+
+    while True:
+        sys.stdout.write(question + prompt)
+        choice = input().lower()
+        if default is not None and choice == '':
+            return valid[default]
+        elif choice in valid:
+            return valid[choice]
+        else:
+            sys.stdout.write("Please respond with 'yes' or 'no' "
+                             "(or 'y' or 'n').\n")
+
+
+def erase_all_in_folder(path):
+    assert path[0] == '.', "For safety relative paths only"
+    path += '*'
+    files = glob.glob(path)
+
+    if len(files) != 0:
+        print("Some files will be automatically removed, listed below.")
+        for f in files:
+            print("{}".format(f))
+
+        assert query_yes_no("Are you okay with this?"), "Aborting"
+
+        print("Removing Files")
+        for f in files:
+            os.remove(f)
 
 
 if __name__ == "__main__":

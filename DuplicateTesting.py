@@ -14,8 +14,8 @@ class VariationManager:
 
         Obj = EuclidMaster()
 
-        function_lookup = {"Redshift" : Obj.setRedshift,
-                        "Dark Matter" : Obj.DarkMatter,
+        function_lookup = {"Redshift" : Obj.set_z,
+                        "Dark Matter" : Obj.create_dark_matter,
                        "Stellar Mass" : Obj.assignStellarMass,
                     "Black Hole Mass" : Obj.assignBlackHoleMass,
                          "Duty Cycle" : Obj.assignDutyCycle,
