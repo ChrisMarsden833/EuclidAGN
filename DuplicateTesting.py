@@ -16,10 +16,10 @@ class VariationManager:
 
         function_lookup = {"Redshift" : Obj.set_z,
                         "Dark Matter" : Obj.create_dark_matter,
-                       "Stellar Mass" : Obj.assignStellarMass,
-                    "Black Hole Mass" : Obj.assignBlackHoleMass,
-                         "Duty Cycle" : Obj.assignDutyCycle,
-                   "Eddington Ratios" : Obj.assignEddingtonRatios,
+                       "Stellar Mass" : Obj.assign_stellar_mass,
+                    "Black Hole Mass" : Obj.assign_black_hole_mass,
+                         "Duty Cycle" : Obj.assign_duty_cycle,
+                   "Eddington Ratios" : Obj.assign_luminosity,
                           "Catalogue" : Obj.CreateCatalogue,
                         "Obscuration" : Obj.Obscuration,
                          "Clustering" : Obj.computeWP }

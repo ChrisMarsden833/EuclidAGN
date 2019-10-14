@@ -20,8 +20,8 @@ from Corrfunc.theory import wp
 from Corrfunc.theory import DD
 
 # Local
-import galaxy_physics as gp
-from Utillity import *
+import AGNCatalogToolbox as at
+from ACTUtillity import *
 from ImageGeneration import *
 
 
@@ -81,7 +81,10 @@ class EuclidMaster:
               ("z", np.float32),
               ("effective_halo_mass", np.float32),
               ("effective_z", np.float32),
-              ("stellar_mass", np.float32)]
+              ("stellar_mass", np.float32),
+              ("black_hole_mass", np.float32),
+              ("duty_cycle", np.float32),
+              ("luminosity", np.float32)]
         self.main_catalog = np.zeros(length, dtype=dt)
         self.main_catalog['effective_z'] = np.ones(length) * self.z
 
@@ -210,234 +213,93 @@ class EuclidMaster:
         self.volume = volume
 
         temporary_halos = \
-            gp.generate_semi_analytic_halo_catalogue(200 ** 3, (mass_low, mass_high, 0.1), self.z, self.h,
+            at.generate_semi_analytic_halo_catalogue(catalogue_volume=volume,
+                                                     mass_params=(mass_low, mass_high, 0.1),
+                                                     z=self.z,
+                                                     h=self.h,
                                                      visual_debugging=False,
-                                                     path="./visualValidation/SemiAnalyticCatalog/")
-
+                                                     erase_debugging_folder=True,
+                                                     visual_debugging_path="./visualValidation/SemiAnalyticCatalog/")
         self.define_main_catalog(len(temporary_halos))
         self.main_catalog['effective_halo_mass'] = temporary_halos
 
-        #self.effective_z = np.zeros_like(masses_cataloge)*self.z
-
-    def assignStellarMass(self, formula="Grylls18", scatter=0.001):
+    def assign_stellar_mass(self, formula="Grylls18", scatter=0.001):
         """ Function to generate stellar masses from halo masses
 
         Just calls the 'class free' function from galaxy_physics
 
-        :param formula: string,
-        :param scatter:
-        :return:
+        :param formula: string, the method to use. Options currently include "Grylls18" and "Moster"
+        :param scatter: float, the magnitude of the scatter (in dex).
+        :return: None
         """
         print("Assigning Stellar Mass")
-        self.main_catalog['stellar_mass'] = gp.halo_mass_to_stellar_mass(self.main_catalog['effective_halo_mass'],
+        self.main_catalog['stellar_mass'] = at.halo_mass_to_stellar_mass(self.main_catalog['effective_halo_mass'],
                                                                          self.main_catalog['effective_z'],
                                                                          formula=formula,
                                                                          scatter=scatter,
                                                                          visual_debugging=False,
+                                                                         erase_debugging_folder=True,
                                                                          debugging_volume=self.volume,
-                                                                         path="./visualValidation/StellarMass/")
+                                                                         visual_debugging_path=
+                                                                         "./visualValidation/StellarMass/")
 
-    def assignBlackHoleMass(self, SMBH = "Francesco", scatter = "intrinsic", scatter_magnitude = 0.6, generateFigures = True):
-        """Function to assign black hole mass from Stellar Mass
+    def assign_black_hole_mass(self, formula="Shankar16", scatter="Intrinsic"):
+        """Function to generate black hole masses atop stellar masses.
 
-        This is based on prescriptions from Shankar and Kormondy and Ho.
-
-        Attributes:
-            SMBH (string) : The prescription to use. Defaults to "Francesco"
-                which represents the Shankar 2016 prescription. Other options
-                include "KormondyHo" and "Eq4".
-            scatter (string) : the 'type' of scatter to be use. Defaults to
-                "intrinsic", which is the scatter suggested by the prescription.
-                Set to "fixed" to introduce a constant scatter.
-            scatter_magnitude (float) : The size of the fixed scatter (dex).
-                Obviously only meaningful if scatter_magnitude is set to fixed.
-                Defaults to 0.6.
-            generateFigures (bool) : flag to generate the figures that exist for
-                visual validation. Defaults to true.
+        :param formula: string, specifying the method to be used, options are "Shankar16",  "KormondyHo" and "Eq4".
+        :param scatter: string or float, string should be "Intrinsic", float value specifies the (fixed) scatter magnitude
+        :return: None
         """
         print("Assigning Black Hole Mass")
-        # Tests
-        TestForRequiredVariables(self, ["z", "stellar_mass"])
+        self.main_catalog['black_hole_mass'] = at.stellar_mass_to_black_hole_mass(self.main_catalog['stellar_mass'],
+                                                                                  method=formula,
+                                                                                  scatter=scatter,
+                                                                                  visual_debugging=False,
+                                                                                  erase_debugging_folder=True,
+                                                                                  debugging_volume=self.volume,
+                                                                                  visual_debugging_path=
+                                                                                  "./visualValidation/BlackHoleMass/")
 
-        if SMBH == "Francesco":
-            log_Black_Hole_Mass = \
-                7.574 + 1.946 * (self.stellar_mass - 11) - \
-                0.306 * (self.stellar_mass - 11)**2. - 0.011 * (self.stellar_mass - 11)**3.
-            if scatter == "intrinsic":
-                log_Black_Hole_Mass += (0.32 - 0.1*(self.stellar_mass - 12.)) * np.random.normal(0., 1.,len(self.stellar_mass))
-            elif scatter == "fixed":
-                log_Black_Hole_Mass += np.random.normal(0., scatter_magnitude, len(self.stellar_mass))
-        elif SMBH == "KormondyHo":
-            log_Black_Hole_Mass = 8.54 + 1.18 * (self.stellar_mass - 11)
-            if scatter == "intrinsic":
-                print("Warning - Kormondy and Ho's intrinsic scatter is effectively fixed, with a scale of 0.5")
-                scatter = np.random.normal(0, 0.5, len(self.stellar_mass))
-                log_Black_Hole_Mass += scatter
-            elif scatter == "fixed":
-                scatter = np.random.normal(0, scatter_magnitude, len(self.stellar_mass))
-                log_Black_Hole_Mass += scatter
-        elif SMBH == 'Eq4':
-            log_Black_Hole_Mass =  8.35 + 1.31 * (self.stellar_mass - 11)
-            if scatter == "intrinsic":
-                print("Warning - Eq4's intrinsic scatter is effectively fixed, with a scale of 0.5")
-                scatter = np.random.normal(0, 0.5, len(self.stellar_mass))
-                log_Black_Hole_Mass += scatter
-            elif scatter == "fixed":
-                scatter = np.random.normal(0, scatter_magnitude, len(self.stellar_mass))
-                log_Black_Hole_Mass += scatter
-        else:
-            assert False, "Unknown SMBH type - {}".format(SMBH)
+    def assign_duty_cycle(self, function="Mann"):
+        """Function to assign black hole masses atop stellar masses.
 
-        self.SMBH_mass = log_Black_Hole_Mass
-
-        if generateFigures:
-            width = 0.1
-            bins = np.arange(6, 10, width)
-
-            hist = np.histogram(self.SMBH_mass, bins = bins)[0]
-            bhmf = (hist/(self.volume))/width
-            log_bhmf = np.log10(bhmf[bhmf != 0])
-            adj_bins = bins[0:-1][bhmf != 0]
-
-            plt.figure()
-            plt.loglog()
-            plt.plot(10**adj_bins, (10**log_bhmf), label = "{}".format(SMBH))
-            plt.xlabel("Black Hole Mass")
-            plt.ylabel("phi")
-            plt.title("Black Hole Mass Function")
-            plt.legend()
-            savePath = self.path_visual_validation + 'BHMF_Validation.png'
-            plt.savefig(savePath)
-            plt.close()
-
-    def assignDutyCycle(self, function = "Mann"):
-        print("Assigning Duty Cycle, {}".format(function))
-        TestForRequiredVariables(self, ["SMBH_mass", "stellar_mass"])
-
-        type_cost = type(function)
-        if type_cost is float or type_cost is int:
-            DC = np.ones_like(self.SMBH_mass) * function
-            self.dutycycle = DC
-        elif isinstance(function, str):
-            if function == "Mann":
-                if self.z > 0.1:
-                    print("Warning - Mann's duty cycle is not set up for redshifts other than zero")
-                Mann_path = self.path_data + "Mann.csv"
-                df = pd.read_csv(Mann_path, header = None)
-                SM = df[0]
-                U = df[1]
-                fn = sp.interpolate.interp1d(SM, U)
-                output = np.zeros_like(self.stellar_mass)
-                output[self.stellar_mass < np.amin(SM)] = np.amin(U)
-                output[self.stellar_mass > np.amax(SM)] = np.amax(U)
-                cut = (self.stellar_mass < np.amax(SM)) * (self.stellar_mass > np.amin(SM))
-                output[cut] = fn(self.stellar_mass[cut])
-                self.dutycycle = 10**output
-
-            elif function == "Schulze":
-                # Find the nearest file to the redshift we want
-                schulzePath = self.path_data + GetCorrectFile("Schulze", self.z, self.path_data)
-                df = pd.read_csv(schulzePath, header = None)
-                Data_BH = df[0]
-                Data_DC = df[1]
-                DC = np.zeros_like(self.SMBH_mass)
-                getDC = sp.interpolate.interp1d(Data_BH, Data_DC)
-                fit = np.polyfit(Data_BH, Data_DC, 1)
-                DC[self.SMBH_mass < np.amin(Data_BH)] = getDC(np.amin(Data_BH)) # )fit[0]*self.SMBH_mass[self.SMBH_mass < np.amin(Data_BH)] + fit[1]
-                DC[self.SMBH_mass > np.amax(Data_BH)] = getDC(np.amax(Data_BH))
-                slice = (self.SMBH_mass > np.amin(Data_BH)) * (self.SMBH_mass < np.amax(Data_BH))
-                DC[slice] = getDC(self.SMBH_mass[slice])
-                self.dutycycle = 10**DC
-            else:
-                assert False, "Unknown Duty Cycle Type {}".format(function)
-        else:
-            assert False, "No duty cycle type specified"
-
-        assert self.dutycycle.any() >= 0.0, "DutyCycle elements < 0 exist. This is a probabiliy, and should therefore not valid"
-        assert self.dutycycle.any() <= 1.0, "DutyCycle elements > 1 exist. This is a probabiliy, and should therefore not valid"
-
-    def assignEddingtonRatios(self, type = "Schechter", redshift_evolution = False, knee = -1, alpha = -0.65):
-        """Function to assign Eddington ratios and luminosities.
-
-        Attributes:
-            type (string) : The type of function to use to assign the luminosity.
-                default is "Schechter", can be set to "PowerLaw"
-            redshift_evolution (bool) : flag to add a redshift evolution term to
-                function assigning luminosity
-            knee (float) : value of the knee of this function. Default -1
-            alpha (float) : value of alpha in this function, default -0.65
+        :param function: string/float, string specifying the method, options are "Mann"/"Schulze", or a constant float
+        :return: None
         """
-        print("Assigning Eddington Ratios")
+        print("Assigning Duty Cycle, using {}'s method".format(function))
+        self.main_catalog["duty_cycle"] = at.to_duty_cycle(function,
+                                                           self.main_catalog['stellar_mass'],
+                                                           self.main_catalog['black_hole_mass'],
+                                                           self.z)
 
-        def Schefunc(edd, z):
-            prob = np.ones((len(edd)))
+    def assign_luminosity(self, method="Schechter", redshift_evolution=False, parameter1 = -1, parameter2 = -0.65):
+        """ Function to assign luminosity (based on black hole mass)
 
-            gammaz = 3.47
-            gammaE = alpha
-            z0 = 0.6
-            #knee = -1
-            A = 10.**(-1.41)
-            prob = ((edd/(10.**(knee)))**gammaE)
+        :param method: string, the function to pull the Eddington Ratios from. Options are "Schechter", "PowerLaw" or
+        "Gaussian".
+        :param redshift_evolution: bool, if set to true will introduce a factor representing the z-evolution.
+        :param parameter1: float, the first parameter for the method. For Schechter it is the knee, for PowerLaw it is not used,
+        and for the Gaussian it is sigma.
+        :param parameter2: float, the second parameter for the method. For Schechter it is alpha, for PowerLaw it is not used, for
+        Gaussian it is b.
+        :return: None
+        """
+        print("Assigning Luminosity")
+        self.main_catalog['luminosity'], xlf_plotting_data, edd_plotting_data = \
+            at.black_hole_mass_to_luminosity(self.main_catalog["black_hole_mass"],
+                                             self.main_catalog["duty_cycle"],
+                                             self.main_catalog["stellar_mass"],
+                                             self.z,
+                                             method=method,
+                                             redshift_evolution=redshift_evolution,
+                                             parameter1=parameter1,
+                                             parameter2=parameter2,
+                                             return_plotting_data=True,
+                                             volume=self.volume)
+        # Store the plotting data in class for later comparison.
+        self.XLF_plottingData.append(xlf_plotting_data)
+        self.Edd_plottingData.append(edd_plotting_data)
 
-            if redshift_evolution:
-                prob *= ((1.+z)/(1.+z0))**gammaz
-
-            if type == "Schechter":
-                return prob * np.exp(-(edd/(10.**(knee))));
-            elif type == "PowerLaw":
-                return prob
-            else:
-                assert False, "Type is unknown"
-
-        TestForRequiredVariables(self, ["SMBH_mass"])
-
-        #Ledd = 1.28e38*(10.**self.SMBH_mass)
-        Ledd = 38.1072 + self.SMBH_mass
-
-        eddbin = np.arange(-4, 1, 0.0001, dtype = float)
-        probSche = Schefunc(10**eddbin, self.z)
-
-        p = probSche * 10**0.0001
-        r_prob = p[::-1]
-        probcum = np.cumsum(r_prob)
-        r_probcum = probcum[::-1]
-        y = r_probcum/r_probcum[0]
-        y = y[::-1]
-        eddbin = eddbin[::-1]
-
-        a = np.random.random(len(self.SMBH_mass))
-        lgedd = np.interp(a, y, eddbin) #, right=-99)
-        Lbol = lgedd + Ledd
-
-
-        #edd = 10.**lgedd
-        #Lbol = (edd)*Ledd
-        #lgLbol = np.log10(Lbol) - 33.49
-
-        lgLbol = Lbol - 33.49
-        lglum = lgLbol - 1.54 - (0.24*(lgLbol-12.)) - (0.012*((lgLbol-12.)**2.)) + (0.0015*((lgLbol-12.)**3.))
-        lglum = lglum  + 33.49
-
-        self.luminosity = lglum
-
-        # Save Luminosity Function Data
-        step = 0.1
-        bins = np.arange(42, 46, step)
-        Lum_bins = sp.stats.binned_statistic(self.luminosity, self.dutycycle, 'sum', bins = bins)[0]
-        Lum_func = (Lum_bins/self.volume)/step
-        self.XLF_plottingData.append(PlottingData(bins[0:-1][Lum_func > 0], np.log10(Lum_func[Lum_func > 0])))
-
-        # Save Eddington Distribution Data
-        step = 0.5
-        Lg_edd_derived = np.log10(25) + self.luminosity - (35.3802 + self.stellar_mass)  #log10(1.26e38 * 0.002) = 35.3802
-        eddbin = np.arange(-4, 1, step)
-        prob_derived = stats.binned_statistic(Lg_edd_derived, self.dutycycle, 'sum', bins = eddbin)[0]/(step * sum(self.dutycycle))
-
-        eddbin = eddbin[:-1]
-        eddbin = eddbin[prob_derived > 0]
-        prob_derived = prob_derived[prob_derived > 0]
-
-        self.Edd_plottingData.append(PlottingData(eddbin, np.log10(prob_derived)))
 
     def CreateCatalogue(self, LumCut = True, LumLow = 42.01, LumHigh = 44.98):
         print("Creating Catalogue")
@@ -831,11 +693,6 @@ def NHfunc(lgLx, z, lgNH):
 
     return f; # The value of the function f itself.
 
-class PlottingData:
-    def __init__(self, x, y, error = None):
-        self.x = x
-        self.y = y
-
 class data:
     # Parent class for data type objects
     def __init__(self, z):
@@ -1010,14 +867,16 @@ class EddingtonDistributionData(data):
         prob = np.log10(prob[prob > 0])
         return prob
 
+
 if __name__ == "__main__":
     default = EuclidMaster()
     default.set_z(0.1)
     default.generate_semi_analytic_halos(volume=1000 ** 3)
-    default.assignStellarMass()
+    default.assign_stellar_mass()
+    default.assign_black_hole_mass()
+    default.assign_duty_cycle()
+    default.assign_luminosity()
     """
-    default.assignStellarMass()
-    default.assignBlackHoleMass()
     default.assignDutyCycle(0.1)
     default.assignEddingtonRatios()
     default.Obscuration()

@@ -138,6 +138,7 @@ def query_yes_no(question, default="yes"):
 
 def erase_all_in_folder(path):
     assert path[0] == '.', "For safety relative paths only"
+    assert path[-1] == '/', "Directories only"
     path += '*'
     files = glob.glob(path)
 
@@ -151,6 +152,31 @@ def erase_all_in_folder(path):
         print("Removing Files")
         for f in files:
             os.remove(f)
+
+
+def visual_debugging_housekeeping(visual_debugging=True,
+                                  function_name="default",
+                                  erase_debugging_folder=False,
+                                  visual_debugging_path="./default/"):
+    """ function to encapsulate the visual debugging housekeeping that a lot of the functions have to do.
+
+    :param visual_debugging: bool, if to actually continue with visual debugging. If False, this function stops dead.
+    :param function_name: string, the name of the function purely used for printing to the terminal
+    :param erase_debugging_folder: bool, if True will erase the entire contents of folder supplied below
+    :param visual_debugging_path: string, the path to the folder.
+    :return:
+    """
+    if visual_debugging:
+        print("You have activated visual debugging for {}".format(function_name))
+        ValidatePath(visual_debugging_path)
+        if erase_debugging_folder:
+            erase_all_in_folder(visual_debugging_path)
+
+
+class PlottingData:
+    def __init__(self, x, y, error=None):
+        self.x = x
+        self.y = y
 
 
 if __name__ == "__main__":
