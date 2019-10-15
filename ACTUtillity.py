@@ -1,3 +1,4 @@
+# General
 import numpy as np
 import scipy as sp
 from scipy import stats
@@ -10,7 +11,8 @@ import sys
 import multiprocessing
 from numba import jit
 from math import pi
-
+# Specialized
+from colossus.cosmology import cosmology
 
 def GetCorrectFile(string, redshift, directory_path ="./", retz = False):
     """ Function to find the best file in a directory given a redshift.
@@ -178,6 +180,14 @@ class PlottingData:
         self.x = x
         self.y = y
 
+
+class data:
+    # Parent class for data type objects
+    def __init__(self, z):
+        self.dataPath = "./Data/"
+        self.z = z
+        self.cosmology = cosmology.setCosmology('planck18')
+        self.h = self.cosmology.H0/100
 
 if __name__ == "__main__":
     # For the testing of these specific functions.

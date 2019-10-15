@@ -5,9 +5,9 @@ from matplotlib import pyplot as plt
 import scipy as sp
 
 # Specialized
-
 from colossus.lss import mass_function
 from colossus.cosmology import cosmology
+from Corrfunc.theory import wp
 
 # Local
 from ACTUtillity import *
@@ -171,7 +171,6 @@ def halo_mass_to_stellar_mass(halo_mass,
     b = beta10 + beta11 * z_parameter
     g = gamma10 + gamma11 * z_parameter
     # Full formula
-    # DM = self.effective_halo_mass
     internal_stellar_mass = np.log10(np.power(10, halo_mass) *
                                      (2 * n * np.power((np.power(np.power(10, halo_mass - m), -b)
                                                         + np.power(np.power(10, halo_mass - m), g)), -1)))
@@ -440,6 +439,312 @@ def black_hole_mass_to_luminosity(black_hole_mass,
     return luminosity, xlf_plotting_data, edd_plotting_data
 
 
+def generate_nh_distribution(lg_luminosity, z, lg_nh):
+    """ Function written by Viola to generate (I think) a distribution of nh values for the appropriate luminosity.
+
+    :param lg_luminosity: float, value for luminosity (log10)
+    :param z: float, redshift
+    :param lg_nh: float, array of possible nh values
+    :return: array, the probability distribution over lg_nh.
+    """
+    xi_min, xi_max, xi0_4375, a1, eps, fctk, beta = 0.2, 0.84, 0.43, 0.48, 1.7, 1., 0.24
+    if z > 2:
+        z = 2
+    xi_4375 = (xi0_4375*(1+z)**a1) - beta*(lg_luminosity - 43.75)
+    max_ = max(xi_4375, xi_min)
+    xi = min(xi_max, max_)
+    fra = (1 + eps)/(3 + eps)
+    f = np.ones(len(lg_nh))
+
+    # Boolean flags to separate conditions
+    flag = np.where((lg_nh < 21) & (lg_nh >= 20))
+    flag1 = np.where((lg_nh < 22) & (lg_nh >= 21))
+    flag2 = np.where((lg_nh < 23) & (lg_nh >= 22))
+    flag3 = np.where((lg_nh < 24) & (lg_nh >= 23))
+    flag4 = np.where((lg_nh < 26) & (lg_nh >= 24))
+    if xi < fra:
+        f[flag] = 1 - ((2 + eps)/(1 + eps))*xi
+        f[flag1] = (1/(1 + eps))*xi
+        f[flag2] = (1/(1 + eps))*xi
+        f[flag3] = (eps/(1 + eps))*xi
+        f[flag4] = (fctk/2)*xi
+    else:
+        f[flag] = (2/3) - ((3 + 2*eps)/(3 + 3*eps))*xi
+        f[flag1] = (1/3) - (eps/(3 + 3*eps))*xi
+        f[flag2] = (1/(1 + eps))*xi
+        f[flag3] = (eps/(1 + eps))*xi
+        f[flag4] = (fctk/2)*xi
+    return f
+
+
+def luminosity_to_nh(luminosity, z):
+    """ function to generate nh values for the AGN based on the luminosity.
+
+    :param luminosity: array, the luminosity of the AGNs (log10)
+    :param z: float, redshift
+    :return: array, the nh value(s)
+    """
+
+    lg_nh_range = np.arange(20., 30., 0.0001)  # Range, or effective 'possible values' of Nh
+    nh = np.ones(len(luminosity))
+    lg_lx_bins = np.arange(np.amin(luminosity), np.amax(luminosity), 0.01)
+    bin_indexes = np.digitize(luminosity, lg_lx_bins)
+
+    def generate_nh_value(index, length, nh_bins=lg_nh_range):
+        nh_distribution = (generate_nh_distribution(lg_lx_bins[index], z, nh_bins))  # call fn
+        nh_distribution = nh_distribution * 0.01
+        reverse_nh_distribution = nh_distribution[::-1]  # reverse
+        cum_reverse_nh_distribution = np.cumsum(reverse_nh_distribution)  # cumulative sum
+        cum_nh_distribution = cum_reverse_nh_distribution[::-1]  # Reverse again
+        y = cum_nh_distribution / cum_nh_distribution[0]  # Normalize(ish?) by the first element
+        y = y[::-1]  # Reverse AGAIN
+        reverse_nh_bins = nh_bins[::-1]  # Reverse
+        sample = np.random.random(length)
+        return np.interp(sample, y, reverse_nh_bins, right=-99)
+
+    # This loop has been sped up but is still a bottleneck
+    for i in range(len(lg_lx_bins) - 1):  # index for Lx bins
+        flag = np.where(bin_indexes == i)
+        nh[flag] = generate_nh_value(i, len(nh[flag]))
+    return nh
+
+def nh_to_type(nh):
+    """ Simple function that takes an nh value and assigns the AGN type.
+
+    :param nh: array, the nh value
+    :return: array, the type
+    """
+    type1 = np.ones_like(nh)
+    type2 = np.ones_like(nh) * 2
+    thick = np.ones_like(nh) * 3
+
+    type = np.zeros_like(nh)
+    type[nh < 22] = type1[nh < 22]
+    type[(nh >= 22) * (nh < 24)] = type2[[(nh >= 22) * (nh < 24)]]
+    type[nh >= 24] = thick[nh >= 24]
+    return type
+
+
+def compute_wp(x, y, z, period, weights=None, bins = (-1, 1.5, 50), pi_max=50, threads="system"):
+    """ Function to encapsulate wp from Corrfunc.
+
+    :param x: array, x coordinate
+    :param y: array, y coordinate
+    :param z: array, z coordinate
+    :param period: float, the axis of the cosmological volume
+    :param weights: array, weights (if any)
+    :param bins: tuple, of form (low, high, number of steps), representing the bins for WP. Values are in log10.
+    :param pi_max: float, the value of pi_max
+    :param threads: int/string, the number of threads to spawn. Setting threads="system" will spawn a number of threads
+    equal to the (available) cores on your machine. Exceeding this will not result in performance increase.
+    :return: PlottingData object, with x as the bins and y as xi.
+    """
+    if threads == "system":
+        threads = multiprocessing.cpu_count()
+    r_bins = np.logspace(bins[0], bins[1], bins[2])
+    wp_results = wp(period, pi_max, threads, r_bins, x, y, z, weights=weights, weight_type='pair_product', verbose=True)
+    xi = wp_results['wp']
+    return PlottingData(r_bins[:-1], xi)
+
+
+def compute_bias(variable, parent_halo_mass, z, h, cosmology, bin_size = 0.3, weight=None, mask=None):
+    """ Function to compute the bias for a supplied variable. Viola wrote much of this function.
+
+    :param variable: array, the variable to compute the bias against (log10)
+    :param parent_halo_mass: array, the parent halo mass
+    :param z: float, redshift
+    :param h: float, reduced hubble constant
+    :param cosmology: Corrfunc cosmology object, storing all the cosmological parameters.
+    :param bin_size: float, size of the bins (log10) - bin high and low values are automatically calculated.
+    :param weight: array, weights to the bias
+    :param mask: array, if desired, we can mask the data
+    :return: PlottingData object, with the bias vs the bins.
+    """
+    def func_g_squared(z):
+        matter = cosmology.Om0 * (1 + z) ** 3
+        curvature = (1 - cosmology.Om0 - cosmology.Ode0) * (1 + z) ** 2
+        return matter + curvature + cosmology.Ode0
+
+    def func_d(omega, omega_l):
+        # Helper functions
+        a = 5 * omega / 2
+        b = omega ** (4 / 7.) - omega_l
+        c = 1 + omega / 2
+        d = 1 + omega_l / 70.
+        d = a / (b + c * d)
+        return d
+
+    def func_omega_l(omega_l0, g_squared):
+        # Eisenstein 1999
+        return omega_l0 / g_squared
+
+    def func_delta_c(delta_0_critical, d):
+        # delta_c as a function of omega and linear growth
+        # van den Bosch 2001
+        return delta_0_critical/d
+
+    def func_delta_0_critical(omega, p):
+        # A3 van den Bosch 2001
+        return 0.15 * (12 * 3.14159) ** (2 / 3.) * omega ** p
+
+    def func_p(omega_m0, omega_l0):
+        # A4 van den Bosch 2001
+        if omega_m0 < 1 and omega_l0 == 0:
+            return 0.0185
+        if omega_m0 + omega_l0 == 1.0:
+            return 0.0055
+        else:
+            return 0.0055  # VIOLA, had to add this in to make it work with my cosmology, I assume this is okay?
+
+    def func_omega(z, omega_m0, g_squared):
+        # A5 van den Bosch 2001 / eq 10 Eisenstein 1999
+        return omega_m0 * (1 + z) ** 3 / g_squared
+
+    def func_sigma(sigma_8, f, f_8):
+        # A8 van den Bosch 2001
+        return sigma_8 * f / f_8
+
+    def func_u_8(gamma):
+        # A9 van den Bosch 2001
+        return 32 * gamma
+
+    def func_u(gamma, M):
+        # A9 van den Bosch 2001
+        return 3.804e-4 * gamma * (M / cosmology.Om0) ** (1 / 3.)
+
+    def func_f(u):
+        # A10 van den Bosch 2001
+        common = 64.087
+        factors = (1, 1.074, -1.581, 0.954, -0.185)
+        exps = (0, 0.3, 0.4, 0.5, 0.6)
+
+        ret_val = 0.0
+        for i in range(len(factors)):
+            ret_val += factors[i] * u ** exps[i]
+
+        return common * ret_val ** (-10)
+
+    def func_b_eul(nu, delta_sc=1.686, a=0.707, b=0.5, c=0.6):
+        # eq. 8 Sheth 2001
+        a = np.sqrt(a) * delta_sc
+        b = np.sqrt(a) * a * nu ** 2
+        c = np.sqrt(a) * b * (a * nu ** 2) ** (1 - c)
+        d = (a * nu ** 2) ** c
+        e = (a * nu ** 2) ** c + b * (1 - c) * (1 - c / 2)
+        return 1 + (b + c - d / e) / a
+
+    def func_b_eul_tin(nu, delta_sc=1.686, a=0.707, b=0.35, c=0.8):
+        # eq. 8 Tinker 2005
+        a = np.sqrt(a) * delta_sc
+        b = np.sqrt(a) * a * nu ** 2
+        c = np.sqrt(a) * b * (a * nu ** 2) ** (1 - c)
+        d = (a * nu ** 2) ** c
+        e = (a * nu ** 2) ** c + b * (1 - c) * (1 - c / 2)
+        return 1 + (b + c - d / e) / a
+
+    def estimate_sigma(M, z, g_squared, omega_m0=cosmology.Om0, gamma=0.2, sigma_8=0.8):
+        # Estimate sigma for a set of masses
+        # vdb A9
+        u = func_u(gamma, M)
+        u_8 = func_u_8(gamma)
+        # vdb A10
+        f = func_f(u)
+        f_8 = func_f(u_8)
+        # vdb A8
+        sigma = func_sigma(sigma_8, f, f_8)
+        return sigma
+
+    def estimate_delta_c(M, z, g_squared, gamma=0.2, omega_m0=cosmology.Om0, omega_L0=cosmology.Ode0):
+        # Estimate delta_c for a set of masses
+        # Redshift/model dependant parameters
+        omega = func_omega(z, omega_m0, g_squared)
+        omega_l = func_omega_l(omega_L0, g_squared)
+        # vdb A3
+        p = func_p(omega_m0, omega_L0)
+        # Allevato code
+        d1 = func_d(omega, omega_l) / (1 + z)
+        d0 = func_d(omega_m0, omega_L0)
+        d = d1 / d0
+        delta_0_crit = func_delta_0_critical(omega, p)
+        delta_0_crit = 1.686
+        delta_c = func_delta_c(delta_0_crit, d)
+        return delta_c, delta_0_crit
+
+    def estimate_bias_tin(m, z, g_squared, gamma=0.2, omega_m0=cosmology.Om0, omega_L0=cosmology.Ode0,
+                          sigma_8=0.8):
+        # Estimate the bias Tinker + 2005
+        sigma = estimate_sigma(m, z, g_squared, omega_m0, gamma, sigma_8)
+        delta_c, delta_0_crit = estimate_delta_c(m, z, g_squared, gamma, omega_m0, omega_L0)
+        nu = delta_c / sigma
+        return func_b_eul_tin(nu, delta_0_crit)
+
+    g_squared = func_g_squared(z)
+    bias = estimate_bias_tin(((10**parent_halo_mass) * 0.974) * h, z, g_squared)
+    bins = np.arange(np.amin(variable), np.amax(variable), bin_size)
+    mean_bias = np.zeros_like(bins)
+    error_bias = np.zeros_like(bins)
+
+    for i in range(len(bins) - 1):
+        n1 = np.where(((variable) >= bins[i]) & (variable < bins[i + 1]))
+        if mask is not None:
+            n1 *= mask  # Mask out for obscured etc if we want to.
+        if weight is not None:
+            mean_bias[i] = np.sum(bias[n1] * weight[n1]) / np.sum(weight[n1])
+            error_bias[i] = np.sqrt((np.sum(weight[n1] * (bias[n1] - mean_bias[i]) ** 2)) / (
+                        ((len(weight[n1]) - 1) / len(weight[n1])) * np.sum(weight[n1])))
+        else:
+            mean_bias[i] = np.mean(bias[n1])
+            error_bias[i] = np.std(bias[n1])
+    return PlottingData(bins[0:-1], mean_bias[0:-1], error_bias[0:-1])
+
+
+def calculate_hod(up_id, halo_mass, duty_cycle_weight, centrals=True):
+    """ Function to estimate the HOD of a catalogue, only centrals.
+
+    :param up_id: array, the up_id of a cataloguea
+    :param halo_mass: array, the halo mass (log10)
+    :param duty_cycle_weight: array, the duty cycle (for weighting)
+    :param centrals: bool, flag to turn off only calculating for centrals, to calculate for all galaxies.
+    :return:
+    """
+    flagCentrals = np.where(up_id > 0)  # Centrals
+
+    #Halo_mass = np.log10(self.mvir)
+
+    bins = np.arange(11, 15, 0.1)
+    bins_out = bins[0:-1]
+
+    hist_centrals_unweighted = np.histogram(halo_mass[flagCentrals], bins)[0]
+    hist_all = np.histogram(halo_mass, bins)[0]
+
+    if centrals:
+        flag = flagCentrals
+    elif not centrals:
+        flag = np.invert(flagCentrals)
+    else:
+        assert False, "Invalid Value for centrals, should be Boolean"
+
+    if duty_cycle_weight is not None:
+        hist_subject = np.histogram(halo_mass[flag], bins, weights=duty_cycle[flag])[0]
+    else:
+        hist_subject = np.histogram(halo_mass[flag], bins)[0]
+
+    t = np.where(bins_out <= 11.7)  # Not quite sure what these are, or what they are for?
+    h = np.where(bins_out > 11.2)
+    l = np.where(bins_out <= 11.2)
+
+    hod = np.zeros_like(bins_out)
+
+    if not centrals:  # Not sure why we are doing this?
+        hod[t] = 0.0001
+        hod = hist_subject / hist_centrals_unweighted
+    else:
+        hod[h] = hist_subject[h] / hist_centrals_unweighted[h]
+        hod[l] = hist_subject[l] / hist_all[l]
+
+    return PlottingData(bins[0:-1], hod)
+
+
 if __name__ == "__main__":
     cosmo = 'planck18'
     cosmology = cosmology.setCosmology(cosmo)
@@ -466,4 +771,9 @@ if __name__ == "__main__":
     duty_cycle = to_duty_cycle(0.1, stellar_mass, black_hole_mass, 0)
 
     luminosity = black_hole_mass_to_luminosity(black_hole_mass, duty_cycle, stellar_mass, 0)
+
+    nh = luminosity_to_nh(luminosity, 0)
+    agn_type = nh_to_type(nh)
+
+    bias_data = compute_bias(stellar_mass, halos, 0, 0.7, cosmology, bin_size=0.3, weight=duty_cycle, mask=None)
 

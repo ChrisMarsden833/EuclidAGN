@@ -5,7 +5,7 @@ import difflib
 from matplotlib import pyplot as plt
 
 # Local
-from DynamicTesting import *
+from ACTTestingEncapsulation import *
 
 
 class VariationManager:
@@ -21,8 +21,8 @@ class VariationManager:
                          "Duty Cycle" : Obj.assign_duty_cycle,
                    "Eddington Ratios" : Obj.assign_luminosity,
                           "Catalogue" : Obj.CreateCatalogue,
-                        "Obscuration" : Obj.Obscuration,
-                         "Clustering" : Obj.computeWP }
+                        "Obscuration" : Obj.assign_obscuration,
+                         "Clustering" : Obj.get_wp}
 
         argument_numbers = [1,
                             1,
@@ -138,7 +138,7 @@ class VariationManager:
         XLF = XLF_Data(redshift)
         plt.plot(10**XLF.Mi_LX, 10**XLF.Mi_phi, 'o', label = "Miyaji")
 
-        uXLF, ubins = XLF.getUeda14(np.arange(42, 46, 0.1))
+        uXLF, ubins = XLF.get_ueda14(np.arange(42, 46, 0.1))
         plt.plot(10**ubins, 10**uXLF, ':', label = "Ueda")
 
         # Plotting
@@ -183,7 +183,7 @@ class VariationManager:
         plt.errorbar(wp_data.r_Koutoulidis, wp_data.wp_Koutoulidis,\
                         yerr = wp_data.wp_Koutoulidis_e, fmt='o', label = "Koutoulidis Data")
 
-        plt.plot(Obj.wpbins, wp_data.K_powerLaw(Obj.wpbins), label = "Koutoulidis Fit")
+        plt.plot(Obj.wpbins, wp_data.k_power_law(Obj.wpbins), label ="Koutoulidis Fit")
         plt.title(title_array[0])
         #r'wp, z = {}, U = {}'.format(redshift, dutycycle), fontname = 'Times New Roman')
         plt.xlabel(r'$r_p$ $Mpc$')
