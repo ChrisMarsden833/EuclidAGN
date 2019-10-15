@@ -11,6 +11,7 @@ from Corrfunc.theory import wp
 
 # Local
 from ACTUtillity import *
+from ACTImageGeneration import *
 
 
 def generate_semi_analytic_halo_catalogue(catalogue_volume,
@@ -19,7 +20,7 @@ def generate_semi_analytic_halo_catalogue(catalogue_volume,
                                           h,
                                           visual_debugging=False,
                                           erase_debugging_folder=False,
-                                          visual_debugging_path="./"):
+                                          visual_debugging_path="./visualValidation/SemiAnalyticCatalog/"):
     """ Function to generate the semi analytic halo catalogue (without coordinates) for galaxy testing
 
     :param catalogue_volume: float, cosmological volume within which to generate the catalog.
@@ -119,6 +120,117 @@ def generate_semi_analytic_halo_catalogue(catalogue_volume,
 
     mass_catalog = np.log10(mass_catalog)
     return mass_catalog
+
+
+def load_halo_catalog(h, z, cosmology, filename="MD_", path_big_data="./BigData/",
+                      visual_debugging=False,
+                      erase_debugging_folder=False,
+                      visual_debugging_path="./visualValidation/nbodyCatalog/"):
+    """ Function to load in the catalog_data from the multi-dark halo catalogue
+
+    This catalog_data should exist as .npy files in the Directory/BigData. Within
+    this folder there should be a script to pull these out of the SQL
+    database. Note that this expects a .npy file in the with columns x, y, z
+    scale factor at accretion, mass at accretion. If generateFigures is set
+    to True (default), then a further column of the halo mass is also
+    required to validate the halos.
+
+    :param h: float, reduced hubble constant
+    :param z: float, redshift
+    :param cosmology: Colossus cosmology object, the cosmology
+    :param filename: string, component of the filename excluding the redshift - the closest z will be found
+    automatically. Default is "MD_", expecting files of the form "MD_0.0.npy".
+    :param path_big_data: string, path to the location of the data.
+    :param visual_debugging: bool, switch on visual debugging, which plots and outputs the stellar mass function.
+    :param erase_debugging_folder: bool, if we should completely erase the contents of the folder we are writing plots
+    to in advance of writing our own plots. Be exceptionally careful with this - it will list the files and ask for
+    approval. If in doubt, leave False. We include this because old plots can lead to misinformation.
+    :param visual_debugging_path: float, the path to which plots will be sent. Be careful where you point this if you
+    set erase_debugging folder to True, as it will try and erase the contents.
+    :return effective_halo_mass (array), effective_z (array), virial_mass (array), up_id (array)
+
+    """
+    visual_debugging_housekeeping(visual_debugging=visual_debugging,
+                                  function_name="load_halo_catalog",
+                                  erase_debugging_folder=erase_debugging_folder,
+                                  visual_debugging_path=visual_debugging_path)
+
+    print("Loading Halo Catalogue")
+    volume_axis = 1000/h
+    volume = volume_axis**3  # MultiDark Box size, Mpc
+
+    # Search for the closest file and read it in.
+    catalog_file, catalog_z = GetCorrectFile(filename, z, path_big_data, True)
+    print("Found file:", catalog_file)
+    catalog_data = np.load(path_big_data + catalog_file)
+    print("dtypes found: ", catalog_data.dtype)
+
+    # If we want to generate the Halo Mass function figure, this section.
+    if visual_debugging:
+        PlotHaloMassFunction(catalog_data["mvir"][catalog_data["upid"] == -1] / h, z, volume, cosmology,
+                             visual_debugging_path)
+
+    data_x = catalog_data['x']/h
+    data_y = catalog_data['y']/h
+    data_z = catalog_data['z']/h
+    main_id = catalog_data["id"]
+    up_id = catalog_data["upid"]
+    virial_mass = catalog_data["mvir"]/h
+    mass_at_accretion = catalog_data["Macc"]/h
+    accretion_scale = catalog_data["Acc_Scale"]
+
+    del catalog_data  # Save on memory
+
+    # Reserved memory
+    virial_mass_parent = np.zeros_like(virial_mass)
+    idh = np.zeros_like(virial_mass)
+    effective_z = np.zeros_like(accretion_scale)
+
+    print('    Sorting list w.r.t. upId')
+    sorted_indexes = up_id.argsort()  # + 1 Array, rest are reused
+    # To maintain order, we update the class data. This only needs to be done once.
+    data_x = data_x[sorted_indexes]
+    data_y = data_y[sorted_indexes]
+    data_z = data_z[sorted_indexes]
+    # We also do this with the local data
+    main_id = main_id[sorted_indexes]
+    up_id = up_id[sorted_indexes]
+    virial_mass = virial_mass[sorted_indexes]
+    mass_at_accretion = mass_at_accretion[sorted_indexes]
+    accretion_scale = accretion_scale[sorted_indexes]
+    up_id_0 = np.searchsorted(up_id, 0)  # Position where zero should sit on the now sorted up_id.
+    # All arrays are should now sorted by up_id.
+
+    print('    copying all {} elements with up_id = -1'.format(str(up_id_0)))
+    virial_mass_parent[:up_id_0] = virial_mass[:up_id_0]  # MVir of centrals, or where up_id  = -1.
+
+    print('    sorting remaining list list w.r.t. main id')
+    up_id_cut = up_id[up_id_0:]  # Up_id's that are not -1, or the satellites, value pointing to their progenitor.
+
+    id_cut = main_id[:up_id_0]  # ids of centrals
+    virial_mass_cut = virial_mass[:up_id_0]  # masses of centrals
+
+    sorted_indexes = id_cut.argsort()  # get indexes to centrals by id.
+    id_cut = id_cut[sorted_indexes]  # actually sort centrals by id.
+    virial_mass_cut = virial_mass_cut[sorted_indexes]  # sort virial masses the same way.
+
+    print('    copying remaining', str(len(up_id) - up_id_0), 'elements')
+    sorted_indexes = np.searchsorted(id_cut, up_id_cut)  # indexes of where satellite id's point to centrals
+    virial_mass_parent[up_id_0:] = virial_mass_cut[sorted_indexes]  # Sort parents by this, and assign to satellites
+    # This gives us the virial mass of the parent or itself if it is a parent. But do we actually need this?
+    idh[up_id_0:] = 1
+
+    halo_mass = virial_mass
+    halo_mass[idh > 0] = mass_at_accretion[idh > 0]
+
+    effective_z[idh > 0] = 1 / accretion_scale[idh > 0] - 1
+    effective_z[idh < 1] = catalog_z
+
+    # self.main_catalog['virial_mass'] = virial_mass # Not sure we actually need this?
+    effective_halo_mass = np.log10(halo_mass)
+    # self.main_catalog['parent_halo_mass'] = np.log10(virial_mass_parent)
+    # self.main_catalog['up_id'] = up_id
+    return effective_halo_mass, effective_z, np.log10(virial_mass), up_id
 
 
 def halo_mass_to_stellar_mass(halo_mass,

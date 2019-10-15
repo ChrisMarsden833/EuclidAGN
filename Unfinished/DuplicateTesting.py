@@ -12,7 +12,7 @@ class VariationManager:
 
     def __init__(self, parameters):
 
-        Obj = EuclidMaster()
+        Obj = AGNCatalog()
 
         function_lookup = {"Redshift" : Obj.set_z,
                         "Dark Matter" : Obj.create_dark_matter,

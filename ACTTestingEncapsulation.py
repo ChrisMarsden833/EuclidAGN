@@ -5,10 +5,9 @@
 # Local
 import AGNCatalogToolbox as act
 from ACTUtillity import *
-from ImageGeneration import *
 
 
-class EuclidMaster:
+class AGNCatalog:
     """Class that encapsulates the Euclid code.
 
     This object should be created, and then it's member functions should be
@@ -64,6 +63,8 @@ class EuclidMaster:
               ("z", np.float32),
               ("effective_halo_mass", np.float32),
               ("parent_halo_mass", np.float32),
+              ("virial_mass", np.float32),
+              ("up_id", np.float32),
               ("effective_z", np.float32),
               ("stellar_mass", np.float32),
               ("black_hole_mass", np.float32),
@@ -74,7 +75,7 @@ class EuclidMaster:
         self.main_catalog = np.zeros(length, dtype=dt)
         self.main_catalog['effective_z'] = np.ones(length) * self.z
 
-    def load_dm_catalogue(self, generate_figures=True, filename="MD_"):
+    def load_dm_catalogue(self, visual_debugging=False, filename="MD_"):
         """ Function to load in the catalog_data from the multi-dark halo catalogue
 
         This catalog_data should exist as .npy files in the Directory/BigData. Within
@@ -84,98 +85,26 @@ class EuclidMaster:
         to True (default), then a further column of the halo mass is also
         required to validate the halos.
 
-        Attributes:
-            generate_figures (bool) : flag to generate the figures that exist for
-                visual validation. Defaults to true.
-            filename (string) : component of the filename excluding the redshift
-                - the closest z will be found automatically. Default is "MD_",
-                expecting files of the form "MD_0.0.npy".
+
+        :param visual_debugging: bool, flag to generate the figures that exist for visual validation. Defaults to true.
+        :param filename: string, component of the filename excluding the redshift - the closest z will be found
+        automatically. Default is "MD_", expecting files of the form "MD_0.0.npy".
         """
-        print("Loading Halo Catalogue")
-        self.dm_type = "N-Body"  # Flag used for later
-        self.volume_axis = 1000 / self.h
-        self.volume = self.volume_axis**3  # MultiDark Box size, Mpc
+        print("Loading Dark Matter Catalog")
+        effective_halo_mass, effective_z, virial_mass, up_id =\
+            act.load_halo_catalog(self.h, self.z, self.cosmology,
+                                  filename=filename,
+                                  path_big_data="./BigData/",
+                                  visual_debugging=visual_debugging,
+                                  erase_debugging_folder=True,
+                                  visual_debugging_path="./visualValidation/NBodyCatalog/")
 
-        # Search for the closest file and read it in.
-        catalog_file, catalog_z = GetCorrectFile(filename, self.z, self.path_bigData, True)
-        print("Found file:", catalog_file)
-        catalog_data = np.load(self.path_bigData + catalog_file)
-        print("dtypes found: ", catalog_data.dtype)
+        self.main_catalog["effective_halo_mass"] = effective_halo_mass
+        self.main_catalog["effective_z"] = effective_z
+        self.main_catalog["virial_mass"] = virial_mass
+        self.main_catalog["up_id"] = up_id
 
-        self.define_main_catalog(len(catalog_data))
-
-        # If we want to generate the Halo Mass function figure, this section.
-        if generate_figures:
-            PlotHaloMassFunction(catalog_data["mvir"][catalog_data["upid"] == -1] / self.h, self.z, self.volume,
-                                 self.cosmology, self.path_visual_validation)
-        
-        # Store the catalog_data in class variable, correcting for h.
-        self.main_catalog['x'] = catalog_data['x']/self.h
-        self.main_catalog['y'] = catalog_data['y']/self.h
-        self.main_catalog['z'] = catalog_data['z']/self.h
-
-        # These things don't need to go into the class (yet), as we're about to use them.
-        main_id = catalog_data["id"]
-        up_id = catalog_data["upid"]
-        virial_mass = catalog_data["mvir"]/self.h
-        mass_at_accretion = catalog_data["Macc"]/self.h
-        accretion_scale = catalog_data["Acc_Scale"]
-
-        del catalog_data  # Save on memory
-
-        # Reserved memory
-        virial_mass_parent = np.zeros_like(virial_mass)
-        idh = np.zeros_like(virial_mass)
-        effective_z = np.zeros_like(accretion_scale)
-
-        print('    Sorting list w.r.t. upId')
-        sorted_indexes = up_id.argsort()  # + 1 Array, rest are reused
-        # To maintain order, we update the class data. This only needs to be done once.
-        self.main_catalog['x'] = self.main_catalog['x'][sorted_indexes]
-        self.main_catalog['y'] = self.main_catalog['y'][sorted_indexes]
-        self.main_catalog['z'] = self.main_catalog['z'][sorted_indexes]
-        # We also do this with the local data
-        main_id = main_id[sorted_indexes]
-        up_id = up_id[sorted_indexes]
-        virial_mass = virial_mass[sorted_indexes]
-        mass_at_accretion = mass_at_accretion[sorted_indexes]
-        accretion_scale = accretion_scale[sorted_indexes]
-        up_id_0 = np.searchsorted(up_id, 0)  # Position where zero should sit on the now sorted up_id.
-        # All arrays are should now sorted by up_id.
-
-        print('    copying all {} elements with up_id = -1'.format(str(up_id_0)))
-        virial_mass_parent[:up_id_0] = virial_mass[:up_id_0]  # MVir of centrals, or where up_id  = -1.
-
-        print('    sorting remaining list list w.r.t. main id')
-        up_id_cut = up_id[up_id_0:]  # Up_id's that are not -1, or the satellites, value pointing to their progenitor.
-
-        id_cut = main_id[:up_id_0]  # ids of centrals
-        virial_mass_cut = virial_mass[:up_id_0]  # masses of centrals
-
-        sorted_indexes = id_cut.argsort()  # get indexes to centrals by id.
-        id_cut = id_cut[sorted_indexes]  # actually sort centrals by id.
-        virial_mass_cut = virial_mass_cut[sorted_indexes]  # sort virial masses the same way.
-
-        print('    copying remaining', str(len(up_id) - up_id_0), 'elements')
-        sorted_indexes = np.searchsorted(id_cut, up_id_cut)  # indexes of where satellite id's point to centrals
-        virial_mass_parent[up_id_0:] = virial_mass_cut[sorted_indexes]  # Sort parents by this, and assign to satellites
-        # This gives us the virial mass of the parent or itself if it is a parent. But do we actually need this?
-        idh[up_id_0:] = 1
-
-        halo_mass = virial_mass
-        halo_mass[idh > 0] = mass_at_accretion[idh > 0]
-
-        effective_z[idh > 0] = 1/accretion_scale[idh > 0] - 1
-        effective_z[idh < 1] = catalog_z
-
-        # self.main_catalog['virial_mass'] = virial_mass # Not sure we actually need this?
-
-        self.main_catalog['effective_halo_mass'] = np.log10(halo_mass)
-        self.main_catalog['effective_z'] = effective_z
-        # self.main_catalog['parent_halo_mass'] = np.log10(virial_mass_parent)
-        # self.main_catalog['up_id'] = up_id
-
-    def generate_semi_analytic_halos(self, volume=500**3, mass_low=12., mass_high=16., generate_figures=True):
+    def generate_semi_analytic_halos(self, volume=500**3, mass_low=12., mass_high=16., visual_debugging=False):
         """Function to generate a catalog of semi-analytic halos.
 
         Function to pull a catalogue of halos from the halo mass function. A
@@ -183,15 +112,11 @@ class EuclidMaster:
         produce a greater number of halos, which will increase resolution at
         additional computational expense.
 
-        Attributes:
-            volume (float) : The volume of the region within which we will
-                create the halos.
-            mass_low (float) : The lowest mass (in log10 M_sun) halo to generate
-                defaulting to 11.
-            mass_high (float) : The highest mass halo to generate, defaulting to
-                15
-            generate_figures (bool) : flag to generate the figures that exist for
-                visual validation. Defaults to true.
+        :param volume: float, The volume of the region within which we will create the halos.
+        :param mass_low: float, The lowest mass (in log10 M_sun) halo to generate defaulting to 11.
+        :param mass_high: float, The highest mass halo to generate, defaulting to 15
+        :param visual_debugging: bool, flag to generate the figures that exist for visual validation. Defaults to true.
+        :return: None
         """
         print("Generating Semi-Analytic halos")
 
@@ -203,12 +128,12 @@ class EuclidMaster:
                                                       mass_params=(mass_low, mass_high, 0.1),
                                                       z=self.z,
                                                       h=self.h,
-                                                      visual_debugging=False,
+                                                      visual_debugging=visual_debugging,
                                                       erase_debugging_folder=True,
                                                       visual_debugging_path="./visualValidation/SemiAnalyticCatalog/")
         self.define_main_catalog(len(temporary_halos))
-        self.main_catalog['effective_halo_mass'] = temporary_halos
-        self.main_catalog['parent_halo_mass'] = temporary_halos # Not sure if this is legitimate.
+        self.main_catalog["effective_halo_mass"] = temporary_halos
+        self.main_catalog["parent_halo_mass"] = temporary_halos  # Not sure if this is legitimate.
 
     def assign_stellar_mass(self, formula="Grylls18", scatter=0.001):
         """ Function to generate stellar masses from halo masses
@@ -220,8 +145,8 @@ class EuclidMaster:
         :return: None
         """
         print("Assigning Stellar Mass")
-        self.main_catalog['stellar_mass'] = act.halo_mass_to_stellar_mass(self.main_catalog['effective_halo_mass'],
-                                                                          self.main_catalog['effective_z'],
+        self.main_catalog["stellar_mass"] = act.halo_mass_to_stellar_mass(self.main_catalog["effective_halo_mass"],
+                                                                          self.main_catalog["effective_z"],
                                                                           formula=formula,
                                                                           scatter=scatter,
                                                                           visual_debugging=False,
@@ -234,7 +159,8 @@ class EuclidMaster:
         """Function to generate black hole masses atop stellar masses.
 
         :param formula: string, specifying the method to be used, options are "Shankar16",  "KormondyHo" and "Eq4".
-        :param scatter: string or float, string should be "Intrinsic", float value specifies the (fixed) scatter magnitude
+        :param scatter: string or float, string should be "Intrinsic", float value specifies the (fixed) scatter
+        magnitude
         :return: None
         """
         print("Assigning Black Hole Mass")
@@ -259,16 +185,16 @@ class EuclidMaster:
                                                             self.main_catalog['black_hole_mass'],
                                                             self.z)
 
-    def assign_luminosity(self, method="Schechter", redshift_evolution=False, parameter1 = -1, parameter2 = -0.65):
+    def assign_luminosity(self, method="Schechter", redshift_evolution=False, parameter1=-1, parameter2=-0.65):
         """ Function to assign luminosity (based on black hole mass)
 
         :param method: string, the function to pull the Eddington Ratios from. Options are "Schechter", "PowerLaw" or
         "Gaussian".
         :param redshift_evolution: bool, if set to true will introduce a factor representing the z-evolution.
-        :param parameter1: float, the first parameter for the method. For Schechter it is the knee, for PowerLaw it is not used,
-        and for the Gaussian it is sigma.
-        :param parameter2: float, the second parameter for the method. For Schechter it is alpha, for PowerLaw it is not used, for
-        Gaussian it is b.
+        :param parameter1: float, the first parameter for the method. For Schechter it is the knee, for PowerLaw it is
+        not used, and for the Gaussian it is sigma.
+        :param parameter2: float, the second parameter for the method. For Schechter it is alpha, for PowerLaw it is
+        not used, for Gaussian it is b.
         :return: None
         """
         print("Assigning Luminosity")
@@ -297,7 +223,7 @@ class EuclidMaster:
         print("Assigning AGN type")
         self.main_catalog["type"] = act.nh_to_type(self.main_catalog["nh"])
 
-    def get_wp(self, threads ="System", pi_max = 50, binStart = -1, binStop = 1.5, binSteps = 50):
+    def get_wp(self, threads="System", pi_max=50, bins=(-1, 1.5, 50)):
         print("Computing wp")
         """Function to compute the correlation function wp
 
@@ -314,9 +240,9 @@ class EuclidMaster:
                                     self.main_catalog["z"],
                                     period=self.volume**(1/3),
                                     weights=self.main_catalog["duty_cycle"],
-                                    bins=(-1, 1.5, 50),
-                                    pi_max=50,
-                                    threads="system")
+                                    bins=bins,
+                                    pi_max=pi_max,
+                                    threads=threads)
 
         self.WP_plottingData.append(wp_results)
 
@@ -361,7 +287,7 @@ class EuclidMaster:
 
 
 if __name__ == "__main__":
-    default = EuclidMaster()
+    default = AGNCatalog()
     default.set_z(0.1)
     default.generate_semi_analytic_halos(volume=1000 ** 3)
     default.assign_stellar_mass()
