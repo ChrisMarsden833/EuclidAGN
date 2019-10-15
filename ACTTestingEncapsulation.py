@@ -75,7 +75,7 @@ class AGNCatalog:
         self.main_catalog = np.zeros(length, dtype=dt)
         self.main_catalog['effective_z'] = np.ones(length) * self.z
 
-    def load_dm_catalogue(self, visual_debugging=False, filename="MD_"):
+    def load_dm_catalog(self, volume_axis=1000, visual_debugging=False, filename="MD_"):
         """ Function to load in the catalog_data from the multi-dark halo catalogue
 
         This catalog_data should exist as .npy files in the Directory/BigData. Within
@@ -85,11 +85,14 @@ class AGNCatalog:
         to True (default), then a further column of the halo mass is also
         required to validate the halos.
 
-
+        :param volume_axis: float, length of one axis of the cosmological box, in units of h^-1
         :param visual_debugging: bool, flag to generate the figures that exist for visual validation. Defaults to true.
         :param filename: string, component of the filename excluding the redshift - the closest z will be found
         automatically. Default is "MD_", expecting files of the form "MD_0.0.npy".
         """
+        volume_axis = volume_axis/self.h
+        self.volume = volume_axis**3  # MultiDark Box size, Mpc
+
         print("Loading Dark Matter Catalog")
         effective_halo_mass, effective_z, virial_mass, up_id =\
             act.load_halo_catalog(self.h, self.z, self.cosmology,
@@ -98,6 +101,7 @@ class AGNCatalog:
                                   visual_debugging=visual_debugging,
                                   erase_debugging_folder=True,
                                   visual_debugging_path="./visualValidation/NBodyCatalog/")
+        self.define_main_catalog(len(effective_halo_mass))
 
         self.main_catalog["effective_halo_mass"] = effective_halo_mass
         self.main_catalog["effective_z"] = effective_z
