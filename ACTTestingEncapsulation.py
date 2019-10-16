@@ -94,7 +94,7 @@ class AGNCatalog:
         self.volume = volume_axis**3  # MultiDark Box size, Mpc
 
         print("Loading Dark Matter Catalog")
-        effective_halo_mass, effective_z, virial_mass, up_id =\
+        effective_halo_mass, effective_z, virial_mass, up_id, x, y, z =\
             act.load_halo_catalog(self.h, self.z, self.cosmology,
                                   filename=filename,
                                   path_big_data="./BigData/",
@@ -107,6 +107,9 @@ class AGNCatalog:
         self.main_catalog["effective_z"] = effective_z
         self.main_catalog["virial_mass"] = virial_mass
         self.main_catalog["up_id"] = up_id
+        self.main_catalog["x"] = x
+        self.main_catalog["y"] = y
+        self.main_catalog["z"] = z
 
     def generate_semi_analytic_halos(self, volume=500**3, mass_low=12., mass_high=16., visual_debugging=False):
         """Function to generate a catalog of semi-analytic halos.
@@ -245,9 +248,9 @@ class AGNCatalog:
                                     period=self.volume**(1/3),
                                     weights=self.main_catalog["duty_cycle"],
                                     bins=bins,
-                                    pi_max=pi_max,
+                                    pimax=pi_max,
                                     threads=threads)
-
+        self.wpbins=np.logspace(bins[0], bins[1], bins[2])
         self.WP_plottingData.append(wp_results)
 
     def get_bias(self, variable="stellar_mass", bin_size=0.3, weight="duty_cycle", mask=None):
@@ -261,8 +264,9 @@ class AGNCatalog:
         :param mask: array/None. If an array, mask the bias calculation.
         :return: None.
         """
+        print("Calculating Bias")
         if isinstance(variable, str):
-            variable = self.mawin_catalog[variable]
+            variable = self.main_catalog[variable]
 
         if isinstance(weight, str):
             weight = self.main_catalog[weight]
@@ -278,12 +282,13 @@ class AGNCatalog:
         :param weight_by_duty_cycle: bool, if we should weight by duty cycle.
         :return: None.
         """
+        print("Calculating HOD")
         if weight_by_duty_cycle:
             weight = self.main_catalog["duty_cycle"]
         else:
             weight = None
         hod_data = act.calculate_hod(self.main_catalog["up_id"],
-                                     self.main_catalog["halo_mass"],
+                                     self.main_catalog["virial_mass"],
                                      weight,
                                      centrals=centrals)
 

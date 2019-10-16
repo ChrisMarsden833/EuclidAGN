@@ -147,7 +147,7 @@ def load_halo_catalog(h, z, cosmology, filename="MD_", path_big_data="./BigData/
     approval. If in doubt, leave False. We include this because old plots can lead to misinformation.
     :param visual_debugging_path: float, the path to which plots will be sent. Be careful where you point this if you
     set erase_debugging folder to True, as it will try and erase the contents.
-    :return effective_halo_mass (array), effective_z (array), virial_mass (array), up_id (array)
+    :return effective_halo_mass (array), effective_z (array), virial_mass (array), up_id (array), x, y, z (arrays).
 
     """
     visual_debugging_housekeeping(visual_debugging=visual_debugging,
@@ -230,7 +230,7 @@ def load_halo_catalog(h, z, cosmology, filename="MD_", path_big_data="./BigData/
     effective_halo_mass = np.log10(halo_mass)
     # self.main_catalog['parent_halo_mass'] = np.log10(virial_mass_parent)
     # self.main_catalog['up_id'] = up_id
-    return effective_halo_mass, effective_z, np.log10(virial_mass), up_id
+    return effective_halo_mass, effective_z, np.log10(virial_mass), up_id, data_x, data_y, data_z
 
 
 def halo_mass_to_stellar_mass(halo_mass,
@@ -637,7 +637,7 @@ def nh_to_type(nh):
     return type
 
 
-def compute_wp(x, y, z, period, weights=None, bins = (-1, 1.5, 50), pi_max=50, threads="system"):
+def compute_wp(x, y, z, period, weights=None, bins=(-1, 1.5, 50), pimax=50, threads="system"):
     """ Function to encapsulate wp from Corrfunc.
 
     :param x: array, x coordinate
@@ -651,10 +651,11 @@ def compute_wp(x, y, z, period, weights=None, bins = (-1, 1.5, 50), pi_max=50, t
     equal to the (available) cores on your machine. Exceeding this will not result in performance increase.
     :return: PlottingData object, with x as the bins and y as xi.
     """
-    if threads == "system":
+    if threads == "System" or threads == "system":
         threads = multiprocessing.cpu_count()
     r_bins = np.logspace(bins[0], bins[1], bins[2])
-    wp_results = wp(period, pi_max, threads, r_bins, x, y, z, weights=weights, weight_type='pair_product', verbose=True)
+
+    wp_results = wp(period, pimax, threads, r_bins, x, y, z, weights=weights, weight_type='pair_product', verbose=True)
     xi = wp_results['wp']
     return PlottingData(r_bins[:-1], xi)
 
@@ -837,7 +838,7 @@ def calculate_hod(up_id, halo_mass, duty_cycle_weight, centrals=True):
         assert False, "Invalid Value for centrals, should be Boolean"
 
     if duty_cycle_weight is not None:
-        hist_subject = np.histogram(halo_mass[flag], bins, weights=duty_cycle[flag])[0]
+        hist_subject = np.histogram(halo_mass[flag], bins, weights=duty_cycle_weight[flag])[0]
     else:
         hist_subject = np.histogram(halo_mass[flag], bins)[0]
 

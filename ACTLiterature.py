@@ -46,7 +46,7 @@ class XLFData(data):
         data.__init__(self, z)
         # Read in Miyanji
         mi_lx, mi_phi = ReadSimpleFile("Miyaji2015", self.z, self.dataPath)
-        self.mi = PlottingData(mi_lx, np.log10(mi_phi))
+        self.mi = PlottingData(10**mi_lx, mi_phi)
 
     def get_miyaji2015(self):
         """ Returns the plotting data for miyanji2015
@@ -128,7 +128,7 @@ class XLFData(data):
         psi[psi_max > psi] = psi_max
 
         if nh == 'free':
-            return np.log10(phi), bins
+            return PlottingData(10**bins, phi)
 
         lim = (1. + eta)/(3. + eta)
         frac = np.zeros(nl)
@@ -157,7 +157,7 @@ class XLFData(data):
                 if nh == 4:
                     frac[k] = (f_ctk/2.)*psi[k] 						# 24.<LogNh<26
         phi = frac*phi
-        return PlottingData(bins, np.log10(phi))
+        return PlottingData(10**bins, phi)
 
 
 class EddingtonDistributionData(data):
