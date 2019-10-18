@@ -142,12 +142,12 @@ class AGNCatalog:
         self.main_catalog["effective_halo_mass"] = temporary_halos
         self.main_catalog["parent_halo_mass"] = temporary_halos  # Not sure if this is legitimate.
 
-    def assign_stellar_mass(self, formula="Grylls18", scatter=0.001):
+    def assign_stellar_mass(self, formula="Grylls19", scatter=0.001):
         """ Function to generate stellar masses from halo masses
 
         Just calls the 'class free' function from galaxy_physics
 
-        :param formula: string, the method to use. Options currently include "Grylls18" and "Moster"
+        :param formula: string, the method to use. Options currently include "Grylls19" and "Moster"
         :param scatter: float, the magnitude of the scatter (in dex).
         :return: None
         """
@@ -180,10 +180,10 @@ class AGNCatalog:
                                                                                    visual_debugging_path=
                                                                                    "./visualValidation/BlackHoleMass/")
 
-    def assign_duty_cycle(self, function="Mann"):
+    def assign_duty_cycle(self, function="Man16"):
         """Function to assign black hole masses atop stellar masses.
 
-        :param function: string/float, string specifying the method, options are "Mann"/"Schulze", or a constant float
+        :param function: string/float, string specifying the method, options are "Man16"/"Schulze", or a constant float
         :return: None
         """
         print("Assigning Duty Cycle, using {}'s method".format(function))

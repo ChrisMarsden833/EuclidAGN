@@ -235,7 +235,7 @@ def load_halo_catalog(h, z, cosmology, filename="MD_", path_big_data="./BigData/
 
 def halo_mass_to_stellar_mass(halo_mass,
                               z,
-                              formula="Grylls18",
+                              formula="Grylls19",
                               scatter=0.001,
                               visual_debugging=False,
                               erase_debugging_folder=False,
@@ -243,13 +243,13 @@ def halo_mass_to_stellar_mass(halo_mass,
                               visual_debugging_path="./"):
     """Function to generate stellar masses from halo masses.
 
-    This is based on Grylls 2018, but also has the option to use the
+    This is based on Grylls 2019, but also has the option to use the
     parameters from Moster. This is a simplified version of Pip's
     DarkMatterToStellarMass() function.
 
     :param halo_mass: array, of halo masses (log10)
     :param z: float, the value of redshift
-    :param formula: string, the method to use. Options currently include "Grylls18" and "Moster"
+    :param formula: string, the method to use. Options currently include "Grylls19" and "Moster"
     :param scatter: bool, to scatter or not
     :param visual_debugging: bool, switch on visual debugging, which plots and outputs the stellar mass function.
     :param erase_debugging_folder: bool, if we should completely erase the contents of the folder we are writing plots
@@ -266,7 +266,7 @@ def halo_mass_to_stellar_mass(halo_mass,
                                   visual_debugging_path=visual_debugging_path)
 
     # If conditions to set the correct parameters.
-    if formula == "Grylls18":
+    if formula == "Grylls19":
         z_parameter = np.divide(z - 0.1, z + 1)
         m_10, shm_norm_10, beta10, gamma10, scatter = 11.95, 0.032, 1.61, 0.54, 0.11
         m_11, shm_norm_11, beta11, gamma11 = 0.4, -0.02, -0.6, -0.1
@@ -404,7 +404,7 @@ def stellar_mass_to_black_hole_mass(stellar_mass,
 def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/"):
     """ Function to assign duty cycle.
 
-    :param method: string/float. If string, should be a method (currently "Mann" or "Schulze"), if float will be value.
+    :param method: string/float. If string, should be a method (currently "Man16" or "Schulze"), if float will be value.
     :param stellar_mass: array, the stellar masses in log10.
     :param black_hole_mass: array, the black hole masses in log10
     :param z: float, redshift
@@ -416,7 +416,7 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
     if method_type is float or method_type is int:
         duty_cycle = np.ones_like(stellar_mass) * method
     elif isinstance(method, str):
-        if method == "Mann":
+        if method == "Man16":
             if z > 0.1:
                 print("Warning - Mann's duty cycle is not set up for redshifts other than zero")
             mann_path = data_path + "Mann.csv"
