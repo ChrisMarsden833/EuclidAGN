@@ -236,7 +236,7 @@ def load_halo_catalog(h, z, cosmology, filename="MD_", path_big_data="./BigData/
 def halo_mass_to_stellar_mass(halo_mass,
                               z,
                               formula="Grylls19",
-                              scatter=0.001,
+                              scatter=0.11,
                               visual_debugging=False,
                               erase_debugging_folder=False,
                               debugging_volume=500 ** 3,
@@ -268,7 +268,7 @@ def halo_mass_to_stellar_mass(halo_mass,
     # If conditions to set the correct parameters.
     if formula == "Grylls19":
         z_parameter = np.divide(z - 0.1, z + 1)
-        m_10, shm_norm_10, beta10, gamma10, scatter = 11.95, 0.032, 1.61, 0.54, 0.11
+        m_10, shm_norm_10, beta10, gamma10 = 11.95, 0.032, 1.61, 0.54
         m_11, shm_norm_11, beta11, gamma11 = 0.4, -0.02, -0.6, -0.1
     elif formula == "Moster":
         z_parameter = np.divide(z, z + 1)
@@ -287,7 +287,8 @@ def halo_mass_to_stellar_mass(halo_mass,
                                      (2 * n * np.power((np.power(np.power(10, halo_mass - m), -b)
                                                         + np.power(np.power(10, halo_mass - m), g)), -1)))
     # Add scatter, if requested.
-    if not isinstance(type(scatter), type(True)):
+    if not scatter == False:
+        print("Scatter is a thing, valued at {}".format(scatter))
         internal_stellar_mass += np.random.normal(scale=scatter, size=np.shape(internal_stellar_mass))
 
     # Generate the figures, if requested.
@@ -348,6 +349,8 @@ def stellar_mass_to_black_hole_mass(stellar_mass,
             log_black_hole_mass += (0.32 - 0.1*(stellar_mass - 12.)) * np.random.normal(0., 1., len(stellar_mass))
         elif isinstance(type(scatter), float):
             log_black_hole_mass += np.random.normal(0., scatter, len(stellar_mass))
+        elif scatter == False or scatter == None:
+            pass
         else:
             assert False, "Unknown Scatter argument {}".format(scatter)
 
@@ -360,6 +363,8 @@ def stellar_mass_to_black_hole_mass(stellar_mass,
         elif isinstance(type(scatter), float):
             scatter = np.random.normal(0, scatter, len(stellar_mass))
             log_black_hole_mass += scatter
+        elif scatter == False or scatter == None:
+            pass
         else:
             assert False, "Unknown Scatter argument {}".format(scatter)
 
@@ -372,6 +377,8 @@ def stellar_mass_to_black_hole_mass(stellar_mass,
         elif scatter == "fixed":
             scatter = np.random.normal(0, scatter, len(stellar_mass))
             log_black_hole_mass += scatter
+        elif scatter == False or scatter == None:
+            pass
         else:
             assert False, "Unknown Scatter argument {}".format(scatter)
     else:
@@ -450,8 +457,10 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
     else:
         assert False, "No duty cycle type specified"
 
-    assert duty_cycle.any() >= 0.0, "DutyCycle elements < 0 exist. This is a probabiliy, and should therefore not valid"
-    assert duty_cycle.any() <= 1.0, "DutyCycle elements > 1 exist. This is a probabiliy, and should therefore not valid"
+    print(duty_cycle)
+
+    assert duty_cycle.all() >= 0.0, "DutyCycle elements < 0 exist. This is a probabiliy, and should therefore not valid"
+    assert duty_cycle.all() <= 1.0, "DutyCycle elements > 1 exist. This is a probabiliy, and should therefore not valid"
     return duty_cycle
 
 
