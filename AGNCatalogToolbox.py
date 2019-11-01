@@ -3,6 +3,8 @@ import numpy as np
 import sys
 from matplotlib import pyplot as plt
 import scipy as sp
+from multiprocessing import Process, Value, Array, Pool
+import time
 
 # Specialized
 from colossus.lss import mass_function
@@ -12,6 +14,7 @@ from Corrfunc.theory import wp
 # Local
 from ACTUtillity import *
 from ACTImageGeneration import *
+
 
 
 def generate_semi_analytic_halo_catalogue(catalogue_volume,
@@ -436,7 +439,7 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
             output[stellar_mass > np.amax(mann_stellar_mass)] = np.amax(mann_duty_cycle)
             cut = (stellar_mass < np.amax(mann_stellar_mass)) * (stellar_mass > np.amin(mann_stellar_mass))
             output[cut] = get_u(stellar_mass[cut])
-            duty_cycle = 10 ** output
+            duty_cycle = output
 
         elif method == "Schulze":
             # Find the nearest file to the redshift we want
@@ -459,9 +462,32 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
 
     print(duty_cycle)
 
-    assert duty_cycle.all() >= 0.0, "DutyCycle elements < 0 exist. This is a probabiliy, and should therefore not valid"
-    assert duty_cycle.all() <= 1.0, "DutyCycle elements > 1 exist. This is a probabiliy, and should therefore not valid"
+    assert len(duty_cycle[(duty_cycle < 0) * (duty_cycle > 1)]) == 0, \
+        "{} Duty Cycle elements outside of the range 0-1 exist. This is a probability, so this is not valid. Values: {}"\
+        .format(len(duty_cycle[(duty_cycle < 0) * (duty_cycle > 1)]), duty_cycle[(duty_cycle < 0) * (duty_cycle > 1)])
+
     return duty_cycle
+
+
+def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshift_evolution=False, z=0):
+    gammaz = 3.47
+    gammaE = arg2
+    z0 = 0.6
+    A = 10. ** (-1.41)
+    prob = ((edd / (10 ** arg1)) ** gammaE)
+
+    if redshift_evolution:
+        prob *= ((1. + z) / (1. + z0)) ** gammaz
+
+    if method == "Schechter":
+        return prob * np.exp(-(edd / (10 ** arg1)))
+    elif method == "PowerLaw":
+        return prob
+    elif method == "Gaussian":
+        return np.exp((edd - arg2) ** 2 / arg1 ** 2)
+    else:
+        assert False, "Type is unknown"
+
 
 
 def black_hole_mass_to_luminosity(black_hole_mass,
@@ -473,7 +499,7 @@ def black_hole_mass_to_luminosity(black_hole_mass,
                                   parameter1=-1,
                                   parameter2=-0.65,
                                   return_plotting_data=False,
-                                  volume = 500**3):
+                                  volume=500**3):
     """ Function to assign the eddington ratios from black hole mass.
 
     :param black_hole_mass: array, the black hole mass (log10)
@@ -493,30 +519,11 @@ def black_hole_mass_to_luminosity(black_hole_mass,
     distribution, both as PlottingData objects (see ACTUtillity).
     """
 
-    def schechter_function(edd):
-        gammaz = 3.47
-        gammaE = parameter2
-        z0 = 0.6
-        A = 10. ** (-1.41)
-        prob = ((edd / (10 ** parameter1)) ** gammaE)
-
-        if redshift_evolution:
-            prob *= ((1. + z) / (1. + z0)) ** gammaz
-
-        if method == "Schechter":
-            return prob * np.exp(-(edd / (10 ** parameter1)))
-        elif method == "PowerLaw":
-            return prob
-        elif method == "Gaussian":
-            return np.exp((edd-parameter2)**2/parameter1**2)
-        else:
-            assert False, "Type is unknown"
-
     l_edd = 38.1072 + black_hole_mass
 
     edd_bin = np.arange(-4, 1, 0.0001)
-    prob_schechter_function = schechter_function(10 ** edd_bin)
-
+    prob_schechter_function = edd_schechter_function(10 ** edd_bin, method=method, arg1=parameter1, arg2=parameter2,
+                                                     redshift_evolution=redshift_evolution, z=z)
     p = prob_schechter_function * (10**0.0001)
     r_prob = p[::-1]
     prob_cum = np.cumsum(r_prob)
@@ -598,7 +605,30 @@ def generate_nh_distribution(lg_luminosity, z, lg_nh):
     return f
 
 
-def luminosity_to_nh(luminosity, z):
+def generate_nh_value_robust(index, length, nh_bins, lg_lx_bins, z):
+    nh_distribution = (generate_nh_distribution(lg_lx_bins[index], z, nh_bins)) * 0.01  # call fn
+    cum_nh_distribution = np.cumsum(nh_distribution[::-1])[::-1]
+    norm_cum_nh_distribution = (cum_nh_distribution/cum_nh_distribution[0])[::-1]
+    reverse_nh_bins = nh_bins[::-1]  # Reverse
+    sample = np.random.random(length)
+    interpolator = sp.interpolate.interp1d(norm_cum_nh_distribution, reverse_nh_bins, bounds_error=False,
+                                           fill_value=(reverse_nh_bins[0], reverse_nh_bins[-1]))
+    return interpolator(sample)
+
+
+def batch_nh(indexes, values, nh_bins, lg_lx_bins, z):
+    out = []
+    for index in indexes:
+        flag = np.where(index == values)[0]
+        if len(flag) == 0:
+            pass
+        else:
+            component = (flag, generate_nh_value_robust(index, len(values[flag]),  nh_bins, lg_lx_bins, z))
+            out.append(component)
+    return out
+
+
+def luminosity_to_nh(luminosity, z, parallel=True):
     """ function to generate nh values for the AGN based on the luminosity.
 
     :param luminosity: array, the luminosity of the AGNs (log10)
@@ -612,21 +642,53 @@ def luminosity_to_nh(luminosity, z):
     bin_indexes = np.digitize(luminosity, lg_lx_bins)
 
     def generate_nh_value(index, length, nh_bins=lg_nh_range):
-        nh_distribution = (generate_nh_distribution(lg_lx_bins[index], z, nh_bins))  # call fn
-        nh_distribution = nh_distribution * 0.01
-        reverse_nh_distribution = nh_distribution[::-1]  # reverse
-        cum_reverse_nh_distribution = np.cumsum(reverse_nh_distribution)  # cumulative sum
-        cum_nh_distribution = cum_reverse_nh_distribution[::-1]  # Reverse again
-        y = cum_nh_distribution / cum_nh_distribution[0]  # Normalize(ish?) by the first element
-        y = y[::-1]  # Reverse AGAIN
+        nh_distribution = (generate_nh_distribution(lg_lx_bins[index], z, nh_bins)) * 0.01  # call fn
+
+        cum_nh_distribution = np.cumsum(nh_distribution[::-1])[::-1]
+        norm_cum_nh_distribution = (cum_nh_distribution/cum_nh_distribution[0])[::-1]
+        
         reverse_nh_bins = nh_bins[::-1]  # Reverse
         sample = np.random.random(length)
-        return np.interp(sample, y, reverse_nh_bins, right=-99)
+        
+        interpolator = sp.interpolate.interp1d(norm_cum_nh_distribution, reverse_nh_bins, bounds_error=False,
+                                               fill_value=(reverse_nh_bins[0], reverse_nh_bins[-1]))
 
-    # This loop has been sped up but is still a bottleneck
-    for i in range(len(lg_lx_bins) - 1):  # index for Lx bins
-        flag = np.where(bin_indexes == i)
-        nh[flag] = generate_nh_value(i, len(nh[flag]))
+        return interpolator(sample)
+
+    if not parallel:
+        tic = time.perf_counter()
+        # This loop has been sped up but is still a bottleneck
+        for i in range(len(lg_lx_bins) - 1):  # index for Lx bins
+            # Serial
+            flag = np.where(bin_indexes == i)
+            nh[flag] = generate_nh_value(i, len(nh[flag]))
+        toc = time.perf_counter()
+        print("SERIAL:", toc - tic)
+
+    if parallel:
+        toc = time.perf_counter()
+        no_proc = 8
+        '''multiprocessing.cpu_count()'''
+        print("Processors:", no_proc)
+        pool = multiprocessing.Pool(no_proc)
+        indexes_list = np.array_split(np.arange(len(lg_lx_bins) - 1), no_proc)
+
+        res = [pool.apply_async(batch_nh, (indexes, bin_indexes, lg_nh_range, lg_lx_bins, z)) for indexes in indexes_list]
+
+        results = [r.get() for r in res]
+
+        pool.close()
+        pool.join()
+
+        continuous_results = []
+        for result in results:
+            continuous_results += result
+        for element in continuous_results:
+                nh[element[0]] = element[1]
+
+        tic = time.perf_counter()
+        print("PARALLEL:", tic - toc)
+
     return nh
 
 def nh_to_type(nh):
@@ -663,6 +725,15 @@ def compute_wp(x, y, z, period, weights=None, bins=(-1, 1.5, 50), pimax=50, thre
     if threads == "System" or threads == "system":
         threads = multiprocessing.cpu_count()
     r_bins = np.logspace(bins[0], bins[1], bins[2])
+
+
+    print("Max x:{}".format(np.amax(x)))
+    print("Max y:{}".format(np.amax(y)))
+    print("Max z:{}".format(np.amax(z)))
+    print("Period:{}".format(period))
+
+    print("Weights, max = {}. , min = {}".format(np.amax(weights), np.amin(weights)))
+
 
     wp_results = wp(period, pimax, threads, r_bins, x, y, z, weights=weights, weight_type='pair_product', verbose=True)
     xi = wp_results['wp']
@@ -873,11 +944,11 @@ if __name__ == "__main__":
     volume = 200**3
 
     halos = generate_semi_analytic_halo_catalogue(volume, (12, 16, 0.1), 0, 0.7,
-                                                  visual_debugging=True,
+                                                  visual_debugging=False,
                                                   erase_debugging_folder=True,
                                                   visual_debugging_path="./visualValidation/SemiAnalyticCatalog/")
     stellar_mass = halo_mass_to_stellar_mass(halos, 0,
-                                             visual_debugging=True,
+                                             visual_debugging=False,
                                              erase_debugging_folder=True,
                                              debugging_volume=volume,
                                              visual_debugging_path="./visualValidation/StellarMass/")
@@ -885,7 +956,7 @@ if __name__ == "__main__":
     black_hole_mass = stellar_mass_to_black_hole_mass(stellar_mass,
                                                       method="Shankar16",
                                                       scatter="Intrinsic",
-                                                      visual_debugging=True,
+                                                      visual_debugging=False,
                                                       erase_debugging_folder=True,
                                                       debugging_volume=volume,
                                                       visual_debugging_path="./visualValidation/BlackHoleMass/")
@@ -897,5 +968,4 @@ if __name__ == "__main__":
     nh = luminosity_to_nh(luminosity, 0)
     agn_type = nh_to_type(nh)
 
-    bias_data = compute_bias(stellar_mass, halos, 0, 0.7, cosmology, bin_size=0.3, weight=duty_cycle, mask=None)
 

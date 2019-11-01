@@ -38,6 +38,8 @@ class AGNCatalog:
         self.volume_axis = 0
         self.volume = 0
 
+        self.wpbins = None
+
         # Primary Catalog
         self.main_catalog = []
 
@@ -220,17 +222,17 @@ class AGNCatalog:
         self.XLF_plottingData.append(xlf_plotting_data)
         self.Edd_plottingData.append(edd_plotting_data)
 
-    def assign_obscuration(self):
+    def assign_obscuration(self, parallel=True):
         """ Function to assign both nh and the AGN type (type 1, type 2 etc). These are rolled together for convenience.
 
         :return: None
         """
         print("Assigning Nh")
-        self.main_catalog["nh"] = act.luminosity_to_nh(self.main_catalog["luminosity"], self.z)
+        self.main_catalog["nh"] = act.luminosity_to_nh(self.main_catalog["luminosity"], self.z, parallel=parallel)
         print("Assigning AGN type")
         self.main_catalog["type"] = act.nh_to_type(self.main_catalog["nh"])
 
-    def get_wp(self, threads="System", pi_max=50, bins=(-1, 1.5, 50)):
+    def get_wp(self, threads="System", pi_max=50, bins=(-1, 1.5, 50), cut=True):
         print("Computing wp")
         """Function to compute the correlation function wp
 
@@ -242,11 +244,23 @@ class AGNCatalog:
             binStop (float) : High limit to the (log spaced) bins. Defaults t0 1.5
             binSteps (int) : The number of spaces in the bins. Defaults to 50
         """
-        wp_results = act.compute_wp(self.main_catalog["x"],
-                                    self.main_catalog["y"],
-                                    self.main_catalog["z"],
+        if cut:
+            '''
+            flag = (self.main_catalog["luminosity"] >= 42.01) *\
+                   (self.main_catalog["luminosity"] <= 44.98) *\
+                   (self.main_catalog["type"] >= 2)
+            '''
+            flag = (self.main_catalog["luminosity"] >= 42.01) *\
+                   (self.main_catalog["luminosity"] <= 44.98) *\
+                   (self.main_catalog["nh"] > 22)
+        else:
+            flag = np.ones_like(self.main_catalog["x"])
+
+        wp_results = act.compute_wp(self.main_catalog["x"][flag],
+                                    self.main_catalog["y"][flag],
+                                    self.main_catalog["z"][flag],
                                     period=self.volume**(1/3),
-                                    weights=self.main_catalog["duty_cycle"],
+                                    weights=self.main_catalog["duty_cycle"][flag],
                                     bins=bins,
                                     pimax=pi_max,
                                     threads=threads)
