@@ -218,6 +218,7 @@ class AGNCatalog:
                                               parameter2=parameter2,
                                               return_plotting_data=True,
                                               volume=self.volume)
+
         # Store the plotting data in class for later comparison.
         self.XLF_plottingData.append(xlf_plotting_data)
         self.Edd_plottingData.append(edd_plotting_data)
@@ -259,7 +260,7 @@ class AGNCatalog:
         wp_results = act.compute_wp(self.main_catalog["x"][flag],
                                     self.main_catalog["y"][flag],
                                     self.main_catalog["z"][flag],
-                                    period=self.volume**(1/3),
+                                    period=(self.volume**(1/3))*self.h,
                                     weights=self.main_catalog["duty_cycle"][flag],
                                     bins=bins,
                                     pimax=pi_max,

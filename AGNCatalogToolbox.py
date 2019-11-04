@@ -173,9 +173,9 @@ def load_halo_catalog(h, z, cosmology, filename="MD_", path_big_data="./BigData/
         PlotHaloMassFunction(catalog_data["mvir"][catalog_data["upid"] == -1] / h, z, volume, cosmology,
                              visual_debugging_path)
 
-    data_x = catalog_data['x']/h
-    data_y = catalog_data['y']/h
-    data_z = catalog_data['z']/h
+    data_x = catalog_data['x']#/h
+    data_y = catalog_data['y']#/h
+    data_z = catalog_data['z']#/h
     main_id = catalog_data["id"]
     up_id = catalog_data["upid"]
     virial_mass = catalog_data["mvir"]/h
@@ -549,6 +549,7 @@ def black_hole_mass_to_luminosity(black_hole_mass,
     bins = np.arange(42, 46, step)
     lum_bins = sp.stats.binned_statistic(luminosity, duty_cycle, 'sum', bins=bins)[0]
     lum_func = (lum_bins/volume)/step
+
     xlf_plotting_data = PlottingData(bins[0:-1][lum_func > 0], np.log10(lum_func[lum_func > 0]))
 
     # Save Eddington Distribution Data
@@ -656,20 +657,14 @@ def luminosity_to_nh(luminosity, z, parallel=True):
         return interpolator(sample)
 
     if not parallel:
-        tic = time.perf_counter()
         # This loop has been sped up but is still a bottleneck
         for i in range(len(lg_lx_bins) - 1):  # index for Lx bins
             # Serial
             flag = np.where(bin_indexes == i)
             nh[flag] = generate_nh_value(i, len(nh[flag]))
-        toc = time.perf_counter()
-        print("SERIAL:", toc - tic)
 
     if parallel:
-        toc = time.perf_counter()
-        no_proc = 8
-        '''multiprocessing.cpu_count()'''
-        print("Processors:", no_proc)
+        no_proc = multiprocessing.cpu_count()
         pool = multiprocessing.Pool(no_proc)
         indexes_list = np.array_split(np.arange(len(lg_lx_bins) - 1), no_proc)
 
@@ -685,9 +680,6 @@ def luminosity_to_nh(luminosity, z, parallel=True):
             continuous_results += result
         for element in continuous_results:
                 nh[element[0]] = element[1]
-
-        tic = time.perf_counter()
-        print("PARALLEL:", tic - toc)
 
     return nh
 
@@ -725,12 +717,6 @@ def compute_wp(x, y, z, period, weights=None, bins=(-1, 1.5, 50), pimax=50, thre
     if threads == "System" or threads == "system":
         threads = multiprocessing.cpu_count()
     r_bins = np.logspace(bins[0], bins[1], bins[2])
-
-
-    print("Max x:{}".format(np.amax(x)))
-    print("Max y:{}".format(np.amax(y)))
-    print("Max z:{}".format(np.amax(z)))
-    print("Period:{}".format(period))
 
     print("Weights, max = {}. , min = {}".format(np.amax(weights), np.amin(weights)))
 
