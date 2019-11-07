@@ -77,7 +77,7 @@ class AGNCatalog:
         self.main_catalog = np.zeros(length, dtype=dt)
         self.main_catalog['effective_z'] = np.ones(length) * self.z
 
-    def load_dm_catalog(self, volume_axis=1000, visual_debugging=False, filename="MD_"):
+    def load_dm_catalog(self, volume_axis=1000, visual_debugging=False, filename="MD_", path_big_data="./BigData/"):
         """ Function to load in the catalog_data from the multi-dark halo catalogue
 
         This catalog_data should exist as .npy files in the Directory/BigData. Within
@@ -99,7 +99,7 @@ class AGNCatalog:
         effective_halo_mass, effective_z, virial_mass, up_id, x, y, z =\
             act.load_halo_catalog(self.h, self.z, self.cosmology,
                                   filename=filename,
-                                  path_big_data="./BigData/",
+                                  path_big_data=path_big_data,
                                   visual_debugging=visual_debugging,
                                   erase_debugging_folder=True,
                                   visual_debugging_path="./visualValidation/NBodyCatalog/")
@@ -182,7 +182,7 @@ class AGNCatalog:
                                                                                    visual_debugging_path=
                                                                                    "./visualValidation/BlackHoleMass/")
 
-    def assign_duty_cycle(self, function="Man16"):
+    def assign_duty_cycle(self, function="Man16", scale_factor = 1):
         """Function to assign black hole masses atop stellar masses.
 
         :param function: string/float, string specifying the method, options are "Man16"/"Schulze", or a constant float
@@ -192,7 +192,8 @@ class AGNCatalog:
         self.main_catalog["duty_cycle"] = act.to_duty_cycle(function,
                                                             self.main_catalog['stellar_mass'],
                                                             self.main_catalog['black_hole_mass'],
-                                                            self.z)
+                                                            self.z,
+                                                            scale_factor=scale_factor)
 
     def assign_luminosity(self, method="Schechter", redshift_evolution=False, parameter1=-1, parameter2=-0.65):
         """ Function to assign luminosity (based on black hole mass)

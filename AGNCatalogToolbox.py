@@ -411,7 +411,7 @@ def stellar_mass_to_black_hole_mass(stellar_mass,
     return log_black_hole_mass
 
 
-def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/"):
+def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/", scale_factor=1):
     """ Function to assign duty cycle.
 
     :param method: string/float. If string, should be a method (currently "Man16" or "Schulze"), if float will be value.
@@ -431,30 +431,22 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
                 print("Warning - Mann's duty cycle is not set up for redshifts other than zero")
             mann_path = data_path + "Mann.csv"
             df = pd.read_csv(mann_path, header=None)
-            mann_stellar_mass = df[0]
-            mann_duty_cycle = df[1]
-            get_u = sp.interpolate.interp1d(mann_stellar_mass, mann_duty_cycle)
-            output = np.zeros_like(stellar_mass)
-            output[stellar_mass < np.amin(mann_stellar_mass)] = np.amin(mann_duty_cycle)
-            output[stellar_mass > np.amax(mann_stellar_mass)] = np.amax(mann_duty_cycle)
-            cut = (stellar_mass < np.amax(mann_stellar_mass)) * (stellar_mass > np.amin(mann_stellar_mass))
-            output[cut] = get_u(stellar_mass[cut])
-            duty_cycle = output
+            mann_stellar_mass = df[0].values
+            mann_duty_cycle = df[1].values
+            get_u = sp.interpolate.interp1d(mann_stellar_mass, mann_duty_cycle, bounds_error=False, fill_value=(mann_duty_cycle[0], mann_duty_cycle[-1]) )
+            duty_cycle = get_u(stellar_mass) * scale_factor
 
         elif method == "Schulze":
             # Find the nearest file to the redshift we want
             schulze_path = data_path + GetCorrectFile("Schulze", z, data_path)
+            print("GetCorrectFile:", GetCorrectFile("Schulze", z, data_path))
+            print("Found Schulze file:", schulze_path)
             df = pd.read_csv(schulze_path, header=None)
-            schulze_black_hole_mass = df[0]
-            schulze_duty_cycle = df[1]
+            schulze_black_hole_mass = df[0].values
+            schulze_duty_cycle = df[1].values
             duty_cycle = np.zeros_like(black_hole_mass)
-            get_u = sp.interpolate.interp1d(schulze_black_hole_mass, schulze_duty_cycle)
-            duty_cycle[black_hole_mass < np.amin(schulze_black_hole_mass)] = get_u(np.amin(schulze_black_hole_mass))
-            duty_cycle[black_hole_mass > np.amax(schulze_black_hole_mass)] = get_u(np.amax(schulze_black_hole_mass))
-            cut = (black_hole_mass > np.amin(schulze_black_hole_mass)) *\
-                    (black_hole_mass < np.amax(schulze_black_hole_mass))
-            duty_cycle[cut] = get_u(black_hole_mass[cut])
-            duty_cycle = 10 ** duty_cycle
+            get_u = sp.interpolate.interp1d(schulze_black_hole_mass, schulze_duty_cycle, bounds_error=False, fill_value=(schulze_duty_cycle[0], schulze_duty_cycle[-1]))
+            duty_cycle = 10 ** get_u(black_hole_mass)
         else:
             assert False, "Unknown Duty Cycle Type {}".format(method)
     else:
@@ -533,7 +525,7 @@ def black_hole_mass_to_luminosity(black_hole_mass,
     edd_bin = edd_bin[::-1]
 
     a = np.random.random(len(black_hole_mass))
-    y2edd_bin = sp.interpolate.interp1d(y, edd_bin)
+    y2edd_bin = sp.interpolate.interp1d(y, edd_bin, bounds_error=False, fill_value=(edd_bin[0], edd_bin[-1]))
     lg_edd = y2edd_bin(a)  # lgedd = np.interp(a, y, edd_bin)  # , right=-99)
     l_bol = lg_edd + l_edd
     lg_l_bol = l_bol - 33.49

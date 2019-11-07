@@ -41,7 +41,7 @@ def GetCorrectFile(string, redshift, directory_path ="./", retz = False):
     list = []
     string_list = []
     for file in directories: # Go through all strings (files) in the directory.
-        if string in file: # If the string is in the filename
+        if string in file and file[0] != '.': # If the string is in the filename
             stripped = file.replace(string, '') # remove the string in case we need to
             res = rx.findall(stripped) # Find the numbers within the string.
             if res != []:
