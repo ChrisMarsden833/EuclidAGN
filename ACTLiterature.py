@@ -169,8 +169,8 @@ class EddingtonDistributionData(data):
         data.__init__(self, z)
 
         # Read in Geo17
-        geo_lx, geo_phi = ReadSimpleFile("Geo17", self.z, self.dataPath)
-        self.Geo = PlottingData(geo_lx, geo_phi)
+        geo_lx, geo_phi_top, geo_phi_bottom = ReadSimpleFile("Geo17", self.z, self.dataPath, cols=3)
+        self.Geo = IntervalPlottingData(geo_lx, geo_phi_top, geo_phi_bottom)
 
         # Read in Bon 16
         bon16_lx, bon16_phi = ReadSimpleFile("Bon16", self.z, self.dataPath)

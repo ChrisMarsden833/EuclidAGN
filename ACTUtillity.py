@@ -74,7 +74,7 @@ def ValidatePath(path, ErrorOnFail = False):
         os.mkdir(path)
     return path 
 
-def ReadSimpleFile(string, redshift, path):
+def ReadSimpleFile(string, redshift, path, cols=2):
     """Function to find and read a two column CSV (normally data).
 
     Operation is similar to GetCorrectFile, but actually reads the CSV and 
@@ -85,13 +85,17 @@ def ReadSimpleFile(string, redshift, path):
         redshift (float) : The desired redshift.
         path (string) : Path to the directory we want to look in. Default
             is the current directory.
+        cols (int) : default 2, the number of columns in the file.
     Returns:
         The columns of the CSV, in two parameters (A and B) as slices of
-        pandas dataframes.
+        pandas dataframes. If cols = 3, will return 3 parameters.
     """
     file = path + GetCorrectFile(string, redshift, path)
-    df = pd.read_csv(file, header = None)
-    return df[0], df[1]
+    df = pd.read_csv(file, header=None)
+    if cols == 2:
+        return df[0], df[1]
+    elif cols == 3:
+        return df[0], df[1], df[2]
 
 def TestForRequiredVariables(Obj, Names):
     """Function to check that the supplied list of variables actually exist.
@@ -179,6 +183,13 @@ class PlottingData:
     def __init__(self, x, y, error=None):
         self.x = x
         self.y = y
+
+
+class IntervalPlottingData:
+    def __init__(self, x, yu, yd):
+        self.x = x
+        self.yu = yu
+        self.yd = yd
 
 
 class data:
