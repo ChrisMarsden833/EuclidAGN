@@ -169,20 +169,24 @@ class EddingtonDistributionData(data):
         data.__init__(self, z)
 
         # Read in Geo17
-        geo_lx, geo_phi_top, geo_phi_bottom = ReadSimpleFile("Geo17", self.z, self.dataPath, cols=3)
-        self.Geo = IntervalPlottingData(geo_lx, geo_phi_top, geo_phi_bottom)
+        geo_lx, geo_phi_top, geo_phi_bottom, z = ReadSimpleFile("Geo17", self.z, self.dataPath, cols=3, retz=True)
+        self.Geo = IntervalPlottingData(geo_lx, geo_phi_top, geo_phi_bottom, z=z)
 
         # Read in Bon 16
-        bon16_lx, bon16_phi = ReadSimpleFile("Bon16", self.z, self.dataPath)
-        self.Bon16 = PlottingData(bon16_lx, bon16_phi)
+        bon16_lx, bon16_phi, z = ReadSimpleFile("Bon16", self.z, self.dataPath, retz=True)
+        self.Bon16 = PlottingData(bon16_lx, bon16_phi, z=z)
 
         # Read in Bon 12
-        bon12_lx, bon12_phi = ReadSimpleFile("Bon12", self.z, self.dataPath)
-        self.Bon12 = PlottingData(bon12_lx, bon12_phi)
+        bon12_lx, bon12_phi, z = ReadSimpleFile("Bon12", self.z, self.dataPath, retz=True)
+        self.Bon12 = PlottingData(bon12_lx, bon12_phi, z=z)
 
         # Aird
-        aird_lx, aird_phi = ReadSimpleFile("Aird2018", self.z, self.dataPath)
-        self.Aird = PlottingData(aird_lx, aird_phi)
+        aird_lx, aird_phi, z = ReadSimpleFile("Aird2018", self.z, self.dataPath, retz=True)
+        self.Aird = PlottingData(aird_lx, aird_phi, z=z)
+
+        # Aird12
+        aird_lx, aird_phi, z = ReadSimpleFile("Aird12", self.z, self.dataPath, retz=True)
+        self.Aird12 = PlottingData(aird_lx, aird_phi, z=z)
 
     def AirdDist(self, edd):
         gamma_e = -0.65
@@ -195,3 +199,7 @@ class EddingtonDistributionData(data):
         prob /= bin_width # divide by bin width
         prob = np.log10(prob[prob > 0])
         return prob
+
+
+if __name__ == "__main__":
+    EddData = EddingtonDistributionData(0.0)

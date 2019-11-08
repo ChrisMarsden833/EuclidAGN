@@ -74,7 +74,7 @@ def ValidatePath(path, ErrorOnFail = False):
         os.mkdir(path)
     return path 
 
-def ReadSimpleFile(string, redshift, path, cols=2):
+def ReadSimpleFile(string, redshift, path, cols=2, retz=False):
     """Function to find and read a two column CSV (normally data).
 
     Operation is similar to GetCorrectFile, but actually reads the CSV and 
@@ -90,11 +90,16 @@ def ReadSimpleFile(string, redshift, path, cols=2):
         The columns of the CSV, in two parameters (A and B) as slices of
         pandas dataframes. If cols = 3, will return 3 parameters.
     """
-    file = path + GetCorrectFile(string, redshift, path)
+    file_correct, z = GetCorrectFile(string, redshift, path, retz=True)
+    file = path + file_correct
     df = pd.read_csv(file, header=None)
     if cols == 2:
+        if retz:
+            return df[0], df[1], z
         return df[0], df[1]
     elif cols == 3:
+        if retz:
+            return df[0], df[1], df[2], z
         return df[0], df[1], df[2]
 
 def TestForRequiredVariables(Obj, Names):
@@ -180,16 +185,18 @@ def visual_debugging_housekeeping(visual_debugging=True,
 
 
 class PlottingData:
-    def __init__(self, x, y, error=None):
+    def __init__(self, x, y, error=None, z=0):
         self.x = x
         self.y = y
+        self.z = z
 
 
 class IntervalPlottingData:
-    def __init__(self, x, yu, yd):
+    def __init__(self, x, yu, yd, z=0):
         self.x = x
         self.yu = yu
         self.yd = yd
+        self.z = z
 
 
 class data:
