@@ -93,14 +93,15 @@ def ReadSimpleFile(string, redshift, path, cols=2, retz=False):
     file_correct, z = GetCorrectFile(string, redshift, path, retz=True)
     file = path + file_correct
     df = pd.read_csv(file, header=None)
+    print(df)
     if cols == 2:
         if retz:
-            return df[0], df[1], z
-        return df[0], df[1]
+            return df[0].values, df[1].values, z
+        return df[0].values, df[1].values
     elif cols == 3:
         if retz:
-            return df[0], df[1], df[2], z
-        return df[0], df[1], df[2]
+            return df[0].values, df[1].values, df[2].values, z
+        return df[0].values, df[1].values, df[2].values
 
 def TestForRequiredVariables(Obj, Names):
     """Function to check that the supplied list of variables actually exist.
