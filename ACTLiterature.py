@@ -165,8 +165,8 @@ class EddingtonDistributionData(data):
 
     :param z: float, redshift.
     """
-    def __init__(self, z):
-        data.__init__(self, z)
+    def __init__(self, z, datapath="./Data/"):
+        data.__init__(self, z, datapath=datapath)
 
         # Read in Geo17
         geo_lx, geo_phi_top, geo_phi_bottom, z = ReadSimpleFile("Geo17", self.z, self.dataPath, cols=3, retz=True)

@@ -93,7 +93,6 @@ def ReadSimpleFile(string, redshift, path, cols=2, retz=False):
     file_correct, z = GetCorrectFile(string, redshift, path, retz=True)
     file = path + file_correct
     df = pd.read_csv(file, header=None)
-    print(df)
     if cols == 2:
         if retz:
             return df[0].values, df[1].values, z
@@ -202,8 +201,8 @@ class IntervalPlottingData:
 
 class data:
     # Parent class for data type objects
-    def __init__(self, z):
-        self.dataPath = "./Data/"
+    def __init__(self, z, datapath="./Data/"):
+        self.dataPath = datapath
         self.z = z
         self.cosmology = cosmology.setCosmology('planck18')
         self.h = self.cosmology.H0/100
