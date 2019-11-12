@@ -411,7 +411,7 @@ def stellar_mass_to_black_hole_mass(stellar_mass,
     return log_black_hole_mass
 
 
-def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/", scale_factor=1):
+def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/DutyCycles/", scale_factor=1):
     """ Function to assign duty cycle.
 
     :param method: string/float. If string, should be a method (currently "Man16" or "Schulze"), if float will be value.
@@ -433,7 +433,8 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
             df = pd.read_csv(mann_path, header=None)
             mann_stellar_mass = df[0].values
             mann_duty_cycle = df[1].values
-            get_u = sp.interpolate.interp1d(mann_stellar_mass, mann_duty_cycle, bounds_error=False, fill_value=(mann_duty_cycle[0], mann_duty_cycle[-1]) )
+            get_u = sp.interpolate.interp1d(mann_stellar_mass, mann_duty_cycle, bounds_error=False,
+                                            fill_value=(mann_duty_cycle[0], mann_duty_cycle[-1]))
             duty_cycle = get_u(stellar_mass) * scale_factor
 
         elif method == "Schulze":
@@ -445,14 +446,22 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
             schulze_black_hole_mass = df[0].values
             schulze_duty_cycle = df[1].values
             duty_cycle = np.zeros_like(black_hole_mass)
-            get_u = sp.interpolate.interp1d(schulze_black_hole_mass, schulze_duty_cycle, bounds_error=False, fill_value=(schulze_duty_cycle[0], schulze_duty_cycle[-1]))
+            get_u = sp.interpolate.interp1d(schulze_black_hole_mass, schulze_duty_cycle, bounds_error=False,
+                                            fill_value=(schulze_duty_cycle[-1], schulze_duty_cycle[0]))
             duty_cycle = 10 ** get_u(black_hole_mass)
+            print(duty_cycle)
+        elif method == "Geo":
+            geo_stellar_mass, geo_duty_cycle = ReadSimpleFile("Geo17DC", z, data_path)
+            get_u = sp.interpolate.interp1d(geo_stellar_mass, geo_duty_cycle, bounds_error=False,
+                                            fill_value=(geo_duty_cycle[0], geo_duty_cycle[-1]))
+
+            duty_cycle = 10 ** get_u(stellar_mass)
         else:
             assert False, "Unknown Duty Cycle Type {}".format(method)
     else:
         assert False, "No duty cycle type specified"
 
-    print(duty_cycle)
+    #print(duty_cycle)
 
     assert len(duty_cycle[(duty_cycle < 0) * (duty_cycle > 1)]) == 0, \
         "{} Duty Cycle elements outside of the range 0-1 exist. This is a probability, so this is not valid. Values: {}"\
@@ -461,7 +470,7 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
     return duty_cycle
 
 
-def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshift_evolution=False, z=0):
+def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshift_evolution=False, z=0, data_path="./Data/"):
     gammaz = 3.47
     gammaE = arg2
     z0 = 0.6
@@ -477,6 +486,11 @@ def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshif
         return prob
     elif method == "Gaussian":
         return np.exp((edd - arg2) ** 2 / arg1 ** 2)
+    elif method == "Geo":
+        geo_ed, geo_phi_top, geo_phi_bottom, z_new = ReadSimpleFile("Geo17", z, data_path, cols=3, retz=True)
+        mean_phi = (geo_phi_top + geo_phi_bottom)/2
+        get_phi = sp.interpolate.interp1d(geo_ed, mean_phi, bounds_error=False, fill_value=(mean_phi[0], mean_phi[-1]))
+        return get_phi(edd)
     else:
         assert False, "Type is unknown"
 
@@ -939,7 +953,7 @@ if __name__ == "__main__":
                                                       debugging_volume=volume,
                                                       visual_debugging_path="./visualValidation/BlackHoleMass/")
 
-    duty_cycle = to_duty_cycle(0.1, stellar_mass, black_hole_mass, 0)
+    duty_cycle = to_duty_cycle("Geo", stellar_mass, black_hole_mass, 0)
 
     luminosity = black_hole_mass_to_luminosity(black_hole_mass, duty_cycle, stellar_mass, 0)
 
