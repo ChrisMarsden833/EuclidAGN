@@ -475,17 +475,17 @@ def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshif
     gammaE = arg2
     z0 = 0.6
     A = 10. ** (-1.41)
-    prob = ((edd / (10 ** arg1)) ** gammaE)
+    prob = ((edd / (10. ** arg1)) ** gammaE)
 
     if redshift_evolution:
         prob *= ((1. + z) / (1. + z0)) ** gammaz
 
     if method == "Schechter":
-        return prob * np.exp(-(edd / (10 ** arg1)))
+        return prob * np.exp(-(edd / (10. ** arg1)))
     elif method == "PowerLaw":
         return prob
     elif method == "Gaussian":
-        return np.exp((edd - arg2) ** 2 / arg1 ** 2)
+        return np.exp((edd - arg2) ** 2. / arg1 ** 2.)
     elif method == "Geo":
         geo_ed, geo_phi_top, geo_phi_bottom, z_new = ReadSimpleFile("Geo17", z, data_path, cols=3, retz=True)
         mean_phi = (geo_phi_top + geo_phi_bottom)/2

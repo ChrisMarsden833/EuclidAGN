@@ -20,7 +20,7 @@ class AGNCatalog:
             colossus.cosmology, so define as appropriate.
     """
 
-    def __init__(self, cosmo='planck18'):
+    def __init__(self, cosmo='planck18', print_updates=True):
         self.cosmology_name = cosmo
         self.cosmology = cosmology.setCosmology(cosmo)
 
@@ -55,6 +55,8 @@ class AGNCatalog:
             "Black Hole Mass": False,
             "Eddington Ratios": False,
             "Duty Cycle": False}
+
+        self.print_updates = print_updates
 
     def set_z(self, z=0.):
         self.z = z
@@ -207,7 +209,9 @@ class AGNCatalog:
         not used, for Gaussian it is b.
         :return: None
         """
-        print("Assigning Luminosity")
+        if self.print_updates:
+            print("Assigning Luminosity")
+
         self.main_catalog['luminosity'], xlf_plotting_data, edd_plotting_data = \
             act.black_hole_mass_to_luminosity(self.main_catalog["black_hole_mass"],
                                               self.main_catalog["duty_cycle"],
