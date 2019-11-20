@@ -90,11 +90,11 @@ if __name__ == "__main__":
     with open('FittingResults.txt', 'a') as the_file:
         the_file.write('Commenced: {}\n'.format(datetime.datetime.now()))
 
-    z_array = [2]
+    z_array = [1.25]
 
     for z in z_array:
-        alpha_range = np.arange(0., 20., 1.)
-        lambda_range = np.arange(-8., 5., 1.)
+        alpha_range = np.arange(2.5, 2.9, 0.01)
+        lambda_range = np.arange(-1.2, -0.7, 0.01)
 
         print("Lambda range", lambda_range)
 
