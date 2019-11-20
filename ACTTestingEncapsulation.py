@@ -295,7 +295,7 @@ class AGNCatalog:
                                        self.z, self.h, self.cosmology, bin_size=bin_size, weight=weight, mask=mask)
         self.bias_plottingData.append(bias_result)
 
-    def get_hod(self, centrals=True, weight_by_duty_cycle=True):
+    def get_hod(self, centrals=True, weight_by_duty_cycle=True, Obscuration="Both"):
         """ Fuction to calculate the HOD of the catalog
 
         :param centrals: bool, if we should only calculate the HOD for centrals
@@ -303,12 +303,24 @@ class AGNCatalog:
         :return: None.
         """
         print("Calculating HOD")
+
+        if Obscuration=="Both":
+            flag = np.ones_like(self.main_catalog["up_id"])
+        elif Obscuration=="Obscured":
+            flag = (self.main_catalog["nh"] > 22)
+        elif Obscuration=="Unobscured":
+            flag = (self.main_catalog["nh"] < 22)
+        else:
+            assert False, "Unknown obscuration type {}".format(Obscuration)
+
+
         if weight_by_duty_cycle:
-            weight = self.main_catalog["duty_cycle"]
+            weight = self.main_catalog["duty_cycle"][flag]
         else:
             weight = None
-        hod_data = act.calculate_hod(self.main_catalog["up_id"],
-                                     self.main_catalog["virial_mass"],
+
+        hod_data = act.calculate_hod(self.main_catalog["up_id"][flag],
+                                     self.main_catalog["virial_mass"][flag],
                                      weight,
                                      centrals=centrals)
 

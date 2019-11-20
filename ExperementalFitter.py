@@ -16,7 +16,7 @@ class Fitter:
         self.obj = actt.AGNCatalog(print_updates=False)
         self.obj.set_z(redshift)
         # Load in the MultiDark Haloes.
-        self.obj.load_dm_catalog(path_big_data="./BigData/")
+        self.obj.load_dm_catalog(path_big_data="/data/cm1n17/MultiDark/npyData/")
         self.obj.assign_stellar_mass()
         self.obj.assign_black_hole_mass()
         self.obj.assign_duty_cycle("Schulze")
@@ -32,7 +32,7 @@ class Fitter:
         # XLF Stuff
         self.XLF = actl.XLFData(self.redshift)
         # XLF Data
-        self.uXLF_data = self.XLF.get_ueda14(np.arange(42, 46, 0.1))
+        self.uXLF_data = self.XLF.get_ueda14(np.arange(44, 45, 0.1))
 
 
     def DoAGNIteration(self, alphaValue = 0.5, lambda_array = np.linspace(-1, 1, 2)):
@@ -49,7 +49,7 @@ class Fitter:
             xto_data = interpolate.interp1d(self.obj.XLF_plottingData[i].x, self.obj.XLF_plottingData[i].y, bounds_error=False, fill_value=((self.obj.XLF_plottingData[i].y)[0], (self.obj.XLF_plottingData[i].y)[-1]))
             xto_comparison = interpolate.interp1d(np.log10(self.uXLF_data.x), np.log10(self.uXLF_data.y), bounds_error=False, fill_value=( ( np.log10(self.uXLF_data.y[0]), np.log10(self.uXLF_data.y[-1]) ) ) )
 
-            x_range = np.linspace(42, 45.1)
+            x_range = np.linspace(42, 45)
             XLF_RMS[i] = np.sqrt( np.sum( ( (xto_data(x_range) - xto_comparison(x_range) )**2 ) ) )
 
         # ERD Stuff
@@ -90,11 +90,13 @@ if __name__ == "__main__":
     with open('FittingResults.txt', 'a') as the_file:
         the_file.write('Commenced: {}\n'.format(datetime.datetime.now()))
 
-    z_array = [1] #, 0.1, 0.25, 0.75, 1.0, 1.25, 1.75, 2.0, 3.0]
+    z_array = [2]
 
     for z in z_array:
-        alpha_range = np.arange(1.5, 2, 0.1)
-        lambda_range = np.arange(-1.2, -0.5, 0.05)
+        alpha_range = np.arange(0., 20., 1.)
+        lambda_range = np.arange(-8., 5., 1.)
+
+        print("Lambda range", lambda_range)
 
         XLFRMS_minima = np.zeros_like(alpha_range)
         ERDRMS_minima = np.zeros_like(alpha_range)
