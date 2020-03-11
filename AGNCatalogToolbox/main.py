@@ -133,6 +133,7 @@ def generate_semi_analytic_halo_catalogue(catalogue_volume,
 
 
 def load_halo_catalog(h, z, cosmology, filename="MD_", path_big_data="./BigData/",
+                      user = "Chris",
                       visual_debugging=False,
                       erase_debugging_folder=False,
                       visual_debugging_path="./visualValidation/nbodyCatalog/"):
@@ -151,6 +152,7 @@ def load_halo_catalog(h, z, cosmology, filename="MD_", path_big_data="./BigData/
     :param filename: string, component of the filename excluding the redshift - the closest z will be found
     automatically. Default is "MD_", expecting files of the form "MD_0.0.npy".
     :param path_big_data: string, path to the location of the data.
+    :param user: string. This is an adjustable string that allows Viola to use her catalogs quickly. Defaults to "Chris".
     :param visual_debugging: bool, switch on visual debugging, which plots and outputs the stellar mass function.
     :param erase_debugging_folder: bool, if we should completely erase the contents of the folder we are writing plots
     to in advance of writing our own plots. Be exceptionally careful with this - it will list the files and ask for
@@ -170,24 +172,38 @@ def load_halo_catalog(h, z, cosmology, filename="MD_", path_big_data="./BigData/
     volume = volume_axis**3  # MultiDark Box size, Mpc
 
     # Search for the closest file and read it in.
-    catalog_file, catalog_z = utl.GetCorrectFile(filename, z, path_big_data, True)
-    print("Found file:", catalog_file)
-    catalog_data = np.load(path_big_data + catalog_file)
-    print("dtypes found: ", catalog_data.dtype)
+    if user == "Viola":
+        catalog_z = 0.1
+        catalog_data = np.load("MD_1.npy")
+    else:
+        catalog_file, catalog_z = utl.GetCorrectFile(filename, z, path_big_data, True)
+        print("Found file:", catalog_file)
+        catalog_data = np.load(path_big_data + catalog_file)
+        print("dtypes found: ", catalog_data.dtype)
 
     # If we want to generate the Halo Mass function figure, this section.
     if visual_debugging:
         PlotHaloMassFunction(catalog_data["mvir"][catalog_data["upid"] == -1] / h, z, volume, cosmology,
                              visual_debugging_path)
 
-    data_x = catalog_data['x']#/h
-    data_y = catalog_data['y']#/h
-    data_z = catalog_data['z']#/h
-    main_id = catalog_data["id"]
-    up_id = catalog_data["upid"]
-    virial_mass = catalog_data["mvir"]/h
-    mass_at_accretion = catalog_data["Macc"]/h
-    accretion_scale = catalog_data["Acc_Scale"]
+    if user == "Viola":
+        data_x = catalog_data['x']/h
+        data_y = catalog_data['y']/h
+        data_z = catalog_data['z']/h
+        main_id = catalog_data['rockstarId']
+        up_id = catalog_data['upId']
+        virial_mass = catalog_data['Mvir']/h
+        mass_at_accretion = catalog_data['irst_Acc_MvirF']/h
+        accretion_scale = catalog_data['irst_Acc_Scale']
+    else:
+        data_x = catalog_data['x']#/h
+        data_y = catalog_data['y']#/h
+        data_z = catalog_data['z']#/h
+        main_id = catalog_data["id"]
+        up_id = catalog_data["upid"]
+        virial_mass = catalog_data["mvir"]/h
+        mass_at_accretion = catalog_data["First_Acc_Mvir"]/h
+        accretion_scale = catalog_data["First_Acc_Scale"]
 
     del catalog_data  # Save on memory
 
@@ -569,7 +585,7 @@ def black_hole_mass_to_luminosity(black_hole_mass,
 
     # Save Eddington Distribution Data
     step = 0.5
-    lg_edd_derived = np.log10(25) + luminosity - (35.3802 + stellar_mass)  # log10(1.26e38 * 0.002) = 35.3802
+    lg_edd_derived = np.log10(25) + luminosity - (35.3802 + stellar_mass - 0.15)  # log10(1.26e38 * 0.002) = 35.3802
     edd_bin = np.arange(-4, 1, step)
     prob_derived = stats.binned_statistic(lg_edd_derived, duty_cycle, 'sum', bins=edd_bin)[0] / (
                 step * sum(duty_cycle))
