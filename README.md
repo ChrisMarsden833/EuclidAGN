@@ -15,3 +15,5 @@ To make testing easier, I've written an object oriented testing framework, calle
 ## Data
 
 Data is included, **except for the large scale simulation catalogs** if you want to do clustering etc. These should be formatted as .npy files, as structured arrays (for speed). These are read using the function load_halo_catalog(), within main.py, and should be stored within the ./BigData/ directory. Within this directory are some resources to help process these files. You will need ~100GB of storage per file to process these from scratch from the cosmosim website.
+
+**For now, you will need the Data/ directory wherever you choose to import this library, so I suggest you just write your code in the main directory**
