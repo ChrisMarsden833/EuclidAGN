@@ -510,7 +510,7 @@ def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshif
     elif method == "PowerLaw":
         return prob
     elif method == "Gaussian":
-        return np.exp((edd - arg2) ** 2. / arg1 ** 2.)
+        return np.exp(-(edd - arg2) ** 2. / 2.*arg1 ** 2.)
     elif method == "Geo":
         geo_ed, geo_phi_top, geo_phi_bottom, z_new = utl.ReadSimpleFile("Geo17", z, data_path, cols=3, retz=True)
         mean_phi = (geo_phi_top + geo_phi_bottom)/2
