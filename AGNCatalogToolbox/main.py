@@ -552,7 +552,7 @@ def black_hole_mass_to_luminosity(black_hole_mass,
 
     l_edd = 38.1072 + black_hole_mass
 
-    edd_bin = np.arange(-4, 1, 0.0001)
+    edd_bin = np.arange(-4, 0, 0.001)
     prob_schechter_function = edd_schechter_function(10 ** edd_bin, method=method, arg1=parameter1, arg2=parameter2,
                                                      redshift_evolution=redshift_evolution, z=z)
     p = prob_schechter_function * (10**0.0001)
