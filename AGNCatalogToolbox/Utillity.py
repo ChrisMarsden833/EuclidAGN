@@ -189,7 +189,7 @@ class PlottingData:
         self.x = x
         self.y = y
         self.z = z
-
+        self.error = error
 
 class IntervalPlottingData:
     def __init__(self, x, yu, yd, z=0):

@@ -44,8 +44,8 @@ class XLFData(utl.data):
     def __init__(self, z):
         utl.data.__init__(self, z)
         # Read in Miyanji
-        mi_lx, mi_phi = utl.ReadSimpleFile("Miyaji2015", self.z, self.dataPath)
-        self.mi = utl.PlottingData(10**mi_lx, mi_phi)
+        mi_lx, mi_phi, error = utl.ReadSimpleFile("Miyaji2015", self.z, self.dataPath, cols = 3)
+        self.mi = utl.PlottingData(10**mi_lx, mi_phi, error = error)
 
     def get_miyaji2015(self):
         """ Returns the plotting data for miyanji2015
