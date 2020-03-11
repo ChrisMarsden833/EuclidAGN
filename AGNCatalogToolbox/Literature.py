@@ -1,4 +1,6 @@
 import numpy as np
+from scipy import special
+
 # Local
 from AGNCatalogToolbox import Utillity as utl
 
