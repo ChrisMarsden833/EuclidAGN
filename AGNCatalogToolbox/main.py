@@ -520,7 +520,6 @@ def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshif
         assert False, "Type is unknown"
 
 
-
 def black_hole_mass_to_luminosity(black_hole_mass,
                                   duty_cycle,
                                   stellar_mass,
@@ -954,6 +953,14 @@ def calculate_hod(up_id, halo_mass, duty_cycle_weight, centrals=True):
 
     return utl.PlottingData(bins[0:-1], hod)
 
+def SFR(z,Mstar):
+     #adopt Tomczak+16
+
+     s0=0.195+1.157*z-0.143*z**2.
+     gam=1.118
+     M0=9.244+0.753*z-0.090*z**2.
+     sig = 0.2 # intrinsic scatter in the relation in dex
+     return np.log10(10.**(s0-np.log10(1.+(10.**(Mstar-M0))**(-gam))))+np.random.normal(0.,sig,len(Mstar))
 
 if __name__ == "__main__":
     cosmo = 'planck18'
