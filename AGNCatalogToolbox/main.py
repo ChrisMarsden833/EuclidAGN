@@ -131,7 +131,6 @@ def generate_semi_analytic_halo_catalogue(catalogue_volume,
     mass_catalog = np.log10(mass_catalog)
     return mass_catalog
 
-
 def load_halo_catalog(h, z, cosmology, filename="MD_", path_big_data="./BigData/",
                       user = "Chris",
                       visual_debugging=False,
@@ -258,7 +257,6 @@ def load_halo_catalog(h, z, cosmology, filename="MD_", path_big_data="./BigData/
     # self.main_catalog['up_id'] = up_id
     return effective_halo_mass, effective_z, np.log10(virial_mass), up_id, data_x, data_y, data_z
 
-
 def halo_mass_to_stellar_mass(halo_mass,
                               z,
                               formula="Grylls19",
@@ -340,7 +338,6 @@ def halo_mass_to_stellar_mass(halo_mass,
         plt.close()
 
     return internal_stellar_mass
-
 
 def stellar_mass_to_black_hole_mass(stellar_mass,
                                     method="Shankar16",
@@ -433,7 +430,6 @@ def stellar_mass_to_black_hole_mass(stellar_mass,
 
     return log_black_hole_mass
 
-
 def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/DutyCycles/", suppress_output=False):
     """ Function to assign duty cycle.
 
@@ -494,15 +490,14 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
 
     return duty_cycle
 
-
 def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshift_evolution=False, z=0, data_path="./Data/"):
-    gammaz = 3.47
     gammaE = arg2
-    z0 = 0.6
-    A = 10. ** (-1.41)
+    #A = 10. ** (-1.41)
     prob = ((edd / (10. ** arg1)) ** gammaE)
 
     if redshift_evolution:
+        gammaz = 3.47
+        z0 = 0.6
         prob *= ((1. + z) / (1. + z0)) ** gammaz
 
     if method == "Schechter":
@@ -518,7 +513,6 @@ def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshif
         return get_phi(edd)
     else:
         assert False, "Type is unknown"
-
 
 def black_hole_mass_to_luminosity(black_hole_mass,
                                   duty_cycle,
@@ -597,7 +591,6 @@ def black_hole_mass_to_luminosity(black_hole_mass,
 
     return luminosity, xlf_plotting_data, edd_plotting_data
 
-
 def generate_nh_distribution(lg_luminosity, z, lg_nh):
     """ Function written by Viola to generate (I think) a distribution of nh values for the appropriate luminosity.
 
@@ -635,7 +628,6 @@ def generate_nh_distribution(lg_luminosity, z, lg_nh):
         f[flag4] = (fctk/2)*xi
     return f
 
-
 def generate_nh_value_robust(index, length, nh_bins, lg_lx_bins, z):
     nh_distribution = (generate_nh_distribution(lg_lx_bins[index], z, nh_bins)) * 0.01  # call fn
     cum_nh_distribution = np.cumsum(nh_distribution[::-1])[::-1]
@@ -645,7 +637,6 @@ def generate_nh_value_robust(index, length, nh_bins, lg_lx_bins, z):
     interpolator = sp.interpolate.interp1d(norm_cum_nh_distribution, reverse_nh_bins, bounds_error=False,
                                            fill_value=(reverse_nh_bins[0], reverse_nh_bins[-1]))
     return interpolator(sample)
-
 
 def batch_nh(indexes, values, nh_bins, lg_lx_bins, z):
     out = []
@@ -657,7 +648,6 @@ def batch_nh(indexes, values, nh_bins, lg_lx_bins, z):
             component = (flag, generate_nh_value_robust(index, len(values[flag]),  nh_bins, lg_lx_bins, z))
             out.append(component)
     return out
-
 
 def luminosity_to_nh(luminosity, z, parallel=True):
     """ function to generate nh values for the AGN based on the luminosity.
@@ -729,7 +719,6 @@ def nh_to_type(nh):
     type[nh >= 24] = thick[nh >= 24]
     return type
 
-
 def compute_wp(x, y, z, period, weights=None, bins=(-1, 1.5, 50), pimax=50, threads="system"):
     """ Function to encapsulate wp from Corrfunc.
 
@@ -754,7 +743,6 @@ def compute_wp(x, y, z, period, weights=None, bins=(-1, 1.5, 50), pimax=50, thre
     wp_results = wp(period, pimax, threads, r_bins, x, y, z, weights=weights, weight_type='pair_product', verbose=True)
     xi = wp_results['wp']
     return utl.PlottingData(r_bins[:-1], xi)
-
 
 def compute_bias(variable, parent_halo_mass, z, h, cosmology, bin_size = 0.3, weight=None, mask=None):
     """ Function to compute the bias for a supplied variable. Viola wrote much of this function.
@@ -906,7 +894,6 @@ def compute_bias(variable, parent_halo_mass, z, h, cosmology, bin_size = 0.3, we
             error_bias[i] = np.std(bias[n1])
     return utl.PlottingData(bins[0:-1], mean_bias[0:-1], error_bias[0:-1])
 
-
 def calculate_hod(up_id, halo_mass, duty_cycle_weight, centrals=True):
     """ Function to estimate the HOD of a catalogue, only centrals.
 
@@ -953,14 +940,33 @@ def calculate_hod(up_id, halo_mass, duty_cycle_weight, centrals=True):
 
     return utl.PlottingData(bins[0:-1], hod)
 
-def SFR(z,Mstar):
-     #adopt Tomczak+16
+def SFR(z,Mstar, method='Tomczak16'):
+    sig = 0.2 # intrinsic scatter in the relation in dex
 
-     s0=0.195+1.157*z-0.143*z**2.
-     gam=1.118
-     M0=9.244+0.753*z-0.090*z**2.
-     sig = 0.2 # intrinsic scatter in the relation in dex
-     return np.log10(10.**(s0-np.log10(1.+(10.**(Mstar-M0))**(-gam))))+np.random.normal(0.,sig,len(Mstar))
+    if method == 'Tomczak16':
+        #adopt Tomczak+16
+        s0=0.195+1.157*z-0.143*z**2.
+        gam=1.118
+        M0=9.244+0.753*z-0.090*z**2.
+        return np.log10(10.**(s0-np.log10(1.+(10.**(Mstar-M0))**(-gam))))+np.random.normal(0.,sig,len(Mstar))
+
+    elif method == "Schreiber15":
+        r = np.log10(1+z)
+        m = Mstar-9
+        pars = np.array([1.5, 0.3, 2.5, 0.5, 0.36])
+        return schreiber(m, r, *pars) + np.random.normal(0., sig, len(Mstar))
+
+    elif method == "Carraro20":
+        r = np.log10(1+z)
+        m = Mstar-9
+        pars = np.array([2.23465429, 0.64417039, 0.90031132, 0.70135795, 0.91893562])
+        return schreiber(m, r, *pars) + np.random.normal(0., sig, len(Mstar))
+
+    else:
+        assert False, "Method is unknown"
+
+def schreiber(m,r,a0,a1,a2,m0,m1):
+    return m - m0 + a0*r - a1*(np.maximum(0.,m-m1-a2*r))**2
 
 if __name__ == "__main__":
     cosmo = 'planck18'
