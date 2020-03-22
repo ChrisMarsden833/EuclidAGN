@@ -562,14 +562,14 @@ def black_hole_mass_to_luminosity(black_hole_mass,
     lg_edd = y2edd_bin(a)  # lgedd = np.interp(a, y, edd_bin)  # , right=-99)
     l_bol = lg_edd + l_edd
 
-    if bol_corr='Marconi04':
+    if bol_corr == 'Marconi04':
        #eq 21
        lg_l_bol = l_bol - 33.49 #convert to L_sun
        lg_lum = lg_l_bol - 1.54 - (0.24 * (lg_l_bol - 12.)) - \
                 (0.012 * ((lg_l_bol - 12.) ** 2.)) + (0.0015 * ((lg_l_bol - 12.) ** 3.))
        luminosity = lg_lum + 33.49 #convert to erg/s
 
-    elif bol_corr='Lusso12_modif':
+    elif bol_corr == 'Lusso12_modif':
       incr=0.01
       #Fits from table2, type2, Spectro+photo,488
       #range from fig 9 Lbol=[9.8-12.2]
@@ -626,7 +626,7 @@ def black_hole_mass_to_luminosity(black_hole_mass,
       corr_fac = interpolate.interp1d(lbol_final,corr_final)
       luminosity=l_bol-corr_fac(l_bol)
 
-    elif bol_corr='Duras20':
+    elif bol_corr == 'Duras20':
        # table1, (Klbol),general
        pars = [10.96, 11.93, 17.79]
        k_corr = pars[0]*(1+((l_bol - 33.485)/pars[1])**pars[2])
