@@ -2,8 +2,8 @@
 import numpy as np
 import sys
 from matplotlib import pyplot as plt
-import scipy as sp
 from scipy import stats
+from scipy import interpolate
 from multiprocessing import Process, Value, Array, Pool
 import multiprocessing
 import time
@@ -77,7 +77,7 @@ def generate_semi_analytic_halo_catalogue(catalogue_volume,
     # Interpolation Tests
     # Interpolator for the testing - we will update this with the volume in a second.
     # This is essentially for a volume of size unity.
-    interpolator = sp.interpolate.interp1d(cumulative_mass_function, mass_range)
+    interpolator = interpolate.interp1d(cumulative_mass_function, mass_range)
 
     sample_index = int(np.floor(len(cumulative_mass_function) / 2))  # index of the half way point
     num_test = cumulative_mass_function[sample_index]  # The value of the cum function at this index
@@ -98,7 +98,7 @@ def generate_semi_analytic_halo_catalogue(catalogue_volume,
     range_numbers = np.arange(max_number)
 
     # Update interpolator
-    interpolator = sp.interpolate.interp1d(cumulative_mass_function, mass_range)
+    interpolator = interpolate.interp1d(cumulative_mass_function, mass_range)
     mass_catalog = interpolator(range_numbers[range_numbers >= np.amin(cumulative_mass_function)])
 
     # Reconstruct HMF
@@ -452,7 +452,7 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
             df = pd.read_csv(mann_path, header=None)
             mann_stellar_mass = df[0].values
             mann_duty_cycle = df[1].values
-            get_u = sp.interpolate.interp1d(mann_stellar_mass, mann_duty_cycle, bounds_error=False,
+            get_u = interpolate.interp1d(mann_stellar_mass, mann_duty_cycle, bounds_error=False,
                                             fill_value=(mann_duty_cycle[0], mann_duty_cycle[-1]))
             duty_cycle = get_u(stellar_mass)
 
@@ -467,14 +467,14 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
             schulze_black_hole_mass = df[0].values
             schulze_duty_cycle = df[1].values
             duty_cycle = np.zeros_like(black_hole_mass)
-            get_u = sp.interpolate.interp1d(schulze_black_hole_mass, schulze_duty_cycle, bounds_error=False,
+            get_u = interpolate.interp1d(schulze_black_hole_mass, schulze_duty_cycle, bounds_error=False,
                                             fill_value=(schulze_duty_cycle[-1], schulze_duty_cycle[0]))
             duty_cycle = 10 ** get_u(black_hole_mass)
             if not suppress_output:
                 print(duty_cycle)
         elif method == "Geo":
             geo_stellar_mass, geo_duty_cycle = utl.ReadSimpleFile("Geo17DC", z, data_path)
-            get_u = sp.interpolate.interp1d(geo_stellar_mass, geo_duty_cycle, bounds_error=False,
+            get_u = interpolate.interp1d(geo_stellar_mass, geo_duty_cycle, bounds_error=False,
                                             fill_value=(geo_duty_cycle[0], geo_duty_cycle[-1]))
 
             duty_cycle = 10 ** get_u(stellar_mass)
@@ -509,7 +509,7 @@ def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshif
     elif method == "Geo":
         geo_ed, geo_phi_top, geo_phi_bottom, z_new = utl.ReadSimpleFile("Geo17", z, data_path, cols=3, retz=True)
         mean_phi = (geo_phi_top + geo_phi_bottom)/2
-        get_phi = sp.interpolate.interp1d(geo_ed, mean_phi, bounds_error=False, fill_value=(mean_phi[0], mean_phi[-1]))
+        get_phi = interpolate.interp1d(geo_ed, mean_phi, bounds_error=False, fill_value=(mean_phi[0], mean_phi[-1]))
         return get_phi(edd)
     else:
         assert False, "Type is unknown"
@@ -519,6 +519,7 @@ def black_hole_mass_to_luminosity(black_hole_mass,
                                   stellar_mass,
                                   z=0,
                                   method="Schechter",
+                                  bol_corr='Duras20',
                                   redshift_evolution=False,
                                   parameter1=-1,
                                   parameter2=-0.65,
@@ -557,13 +558,81 @@ def black_hole_mass_to_luminosity(black_hole_mass,
     edd_bin = edd_bin[::-1]
 
     a = np.random.random(len(black_hole_mass))
-    y2edd_bin = sp.interpolate.interp1d(y, edd_bin, bounds_error=False, fill_value=(edd_bin[0], edd_bin[-1]))
+    y2edd_bin = interpolate.interp1d(y, edd_bin, bounds_error=False, fill_value=(edd_bin[0], edd_bin[-1]))
     lg_edd = y2edd_bin(a)  # lgedd = np.interp(a, y, edd_bin)  # , right=-99)
     l_bol = lg_edd + l_edd
-    lg_l_bol = l_bol - 33.49
-    lg_lum = lg_l_bol - 1.54 - (0.24 * (lg_l_bol - 12.)) - \
-        (0.012 * ((lg_l_bol - 12.) ** 2.)) + (0.0015 * ((lg_l_bol - 12.) ** 3.))
-    luminosity = lg_lum + 33.49
+
+    if bol_corr='Marconi04':
+       #eq 21
+       lg_l_bol = l_bol - 33.49 #convert to L_sun
+       lg_lum = lg_l_bol - 1.54 - (0.24 * (lg_l_bol - 12.)) - \
+                (0.012 * ((lg_l_bol - 12.) ** 2.)) + (0.0015 * ((lg_l_bol - 12.) ** 3.))
+       luminosity = lg_lum + 33.49 #convert to erg/s
+
+    elif bol_corr='Lusso12_modif':
+      incr=0.01
+      #Fits from table2, type2, Spectro+photo,488
+      #range from fig 9 Lbol=[9.8-12.2]
+      pars_t2=[0.23, 0.05, 0.001, 1.256]
+      Lbol2=np.arange(start=9.8,stop=12.2, step=incr)
+      bol_corr2=lusso(Lbol2-12,*pars_t2)
+      Lbol2_erg = Lbol2 + 33.585 #from Lsun to erg/s
+
+      #Fits from table2, type1, Spectro+photo,373
+      # range from fig 9 Lbol=[10.8-13.2]
+      pars_t1 = [0.288, 0.111, -0.007, 1.308]
+      L_max = 13.55 # where bol_corr1=100
+      Lbol1 = np.arange(start=10.8,stop=L_max, step=incr)
+      bol_corr1 = lusso(Lbol1-12,*pars_t1)
+      Lbol1_erg = Lbol1 + 33.585 #from Lsun to erg/s
+
+      #Combine equations, eq 1 from Lusso 2012
+      start = np.min(Lbol1)
+      ending = np.max(Lbol2)
+      LX = np.arange(start=start,stop=ending, step=incr)
+      bol_corr12 = lusso(LX-12,*pars_t1)
+      bol_corr22 = lusso(LX-12,*pars_t2)
+      bol_tot = bol_corr12*(LX-start)/(ending-start)+bol_corr22*(ending-LX)/(ending-start)
+      Lbol_tot = LX + 33.585 #from Lsun to erg/s
+
+      # Low luminosity (She et al. 2017)
+      lx_final = np.arange(start=36,stop=np.min(Lbol2_erg), step=incr)
+      low_lum = np.log10(16)*np.ones(len(lx_final))
+
+      # Compose to make one array:
+      # low lum + AGN2
+      a = [Lbol2_erg < np.min(Lbol1_erg)]
+      lx_final = np.concatenate((lx_final,Lbol2_erg[a]))
+      corr_final = np.concatenate((low_lum,bol_corr2[a]))
+      # + intermidiate area
+      lx_final = np.concatenate((lx_final,Lbol_tot))
+      corr_final = np.concatenate((corr_final,bol_tot))
+      # + AGN1 up to 100
+      a = [Lbol1_erg > np.max(Lbol2_erg)]
+      lx_final = np.concatenate((lx_final,Lbol1_erg[a]))
+      corr_final = np.concatenate((corr_final,bol_corr1[a]))
+      # + flat area
+      lx_high = np.arange(start=max(Lbol1_erg),stop=48.6,step=incr)
+      corr_high = 2*np.ones(len(lx_high))
+      lbol_final = np.concatenate((lx_final,lx_high))
+      corr_final = np.concatenate((corr_final,corr_high))
+
+      #plt.plot(Lbol2_erg,10**bol_corr2) #type2
+      #plt.plot(Lbol1_erg,10**bol_corr1) #type1
+      #plt.plot(Lbol_tot,10**bol_tot) #combination of previous
+      #plt.plot(lbol_final,10**corr_final) #combination + low and high luminosity
+      #plt.yscale('log');
+
+      corr_fac = interpolate.interp1d(lbol_final,corr_final)
+      luminosity=l_bol-corr_fac(l_bol)
+
+    elif bol_corr='Duras20':
+       # table1, (Klbol),general
+       pars = [10.96, 11.93, 17.79]
+       k_corr = pars[0]*(1+((l_bol - 33.485)/pars[1])**pars[2])
+       luminosity=l_bol-k_corr
+    else:
+       assert False, "Bolometric correction is unknown"
 
     if not return_plotting_data:
         return luminosity
@@ -571,7 +640,7 @@ def black_hole_mass_to_luminosity(black_hole_mass,
     # Save Luminosity Function Data
     step = 0.1
     bins = np.arange(42, 46, step)
-    lum_bins = sp.stats.binned_statistic(luminosity, duty_cycle, 'sum', bins=bins)[0]
+    lum_bins = stats.binned_statistic(luminosity, duty_cycle, 'sum', bins=bins)[0]
     lum_func = (lum_bins/volume)/step
 
     xlf_plotting_data = utl.PlottingData(bins[0:-1][lum_func > 0], np.log10(lum_func[lum_func > 0]))
@@ -634,7 +703,7 @@ def generate_nh_value_robust(index, length, nh_bins, lg_lx_bins, z):
     norm_cum_nh_distribution = (cum_nh_distribution/cum_nh_distribution[0])[::-1]
     reverse_nh_bins = nh_bins[::-1]  # Reverse
     sample = np.random.random(length)
-    interpolator = sp.interpolate.interp1d(norm_cum_nh_distribution, reverse_nh_bins, bounds_error=False,
+    interpolator = interpolate.interp1d(norm_cum_nh_distribution, reverse_nh_bins, bounds_error=False,
                                            fill_value=(reverse_nh_bins[0], reverse_nh_bins[-1]))
     return interpolator(sample)
 
@@ -671,7 +740,7 @@ def luminosity_to_nh(luminosity, z, parallel=True):
         reverse_nh_bins = nh_bins[::-1]  # Reverse
         sample = np.random.random(length)
         
-        interpolator = sp.interpolate.interp1d(norm_cum_nh_distribution, reverse_nh_bins, bounds_error=False,
+        interpolator = interpolate.interp1d(norm_cum_nh_distribution, reverse_nh_bins, bounds_error=False,
                                                fill_value=(reverse_nh_bins[0], reverse_nh_bins[-1]))
 
         return interpolator(sample)
@@ -967,6 +1036,9 @@ def SFR(z,Mstar, method='Tomczak16'):
 
 def schreiber(m,r,a0,a1,a2,m0,m1):
     return m - m0 + a0*r - a1*(np.maximum(0.,m-m1-a2*r))**2
+
+def lusso(x, a1, a2, a3, b):
+   return a1*x + a2*x**2 + a3*x**3 + b
 
 if __name__ == "__main__":
     cosmo = 'planck18'
