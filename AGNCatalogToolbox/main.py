@@ -351,7 +351,7 @@ def stellar_mass_to_black_hole_mass(stellar_mass,
     """ Function to assign black hole mass from the stellar mass.
 
     :param stellar_mass: array, of stellar masses in log10
-    :param method: string, specifying the method to be used, current options are "Shankar16",  "KormondyHo" and "Eq4".
+    :param method: string, specifying the method to be used, current options are "Shankar16",  "KormendyHo" and "Eq4".
     :param scatter: string or float, string should be "Intrinsic", float value specifies the (fixed) scatter magnitude
     :param visual_debugging: bool, switch on visual debugging, which plots and outputs the black hole mass function.
     :param erase_debugging_folder: bool, if we should completely erase the contents of the folder we are writing plots
@@ -379,10 +379,10 @@ def stellar_mass_to_black_hole_mass(stellar_mass,
         else:
             assert False, "Unknown Scatter argument {}".format(scatter)
 
-    elif method == "KormondyHo":
+    elif method == "KormendyHo":
         log_black_hole_mass = 8.54 + 1.18 * (stellar_mass - 11)
         if scatter == "Intrinsic" or scatter == "intrinsic":
-            print("Warning - Kormondy and Ho's intrinsic scatter is effectively fixed, with a scale of 0.5")
+            print("Warning - Kormendy and Ho's intrinsic scatter is effectively fixed, with a scale of 0.5")
             scatter = np.random.normal(0, 0.5, len(stellar_mass))
             log_black_hole_mass += scatter
         elif isinstance(type(scatter), float):
@@ -448,7 +448,7 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
         duty_cycle = np.ones_like(stellar_mass) * method
     elif isinstance(method, str):
         if method == "Man16":
-            if z > 0.1 and not supress_output:
+            if z > 0.1 and not suppress_output:
                 print("Warning - Mann's duty cycle is not set up for redshifts other than zero")
             mann_path = data_path + "Mann.csv"
             df = pd.read_csv(mann_path, header=None)
@@ -493,9 +493,9 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
     return duty_cycle
 
 def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshift_evolution=False, z=0, data_path="./Data/"):
-    gammaE = arg2
+    #gammaE = arg2
     #A = 10. ** (-1.41)
-    prob = ((edd / (10. ** arg1)) ** gammaE)
+    prob = ((edd / (10. ** arg1)) ** arg2)
 
     if redshift_evolution:
         gammaz = 3.47
@@ -507,7 +507,7 @@ def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshif
     elif method == "PowerLaw":
         return prob
     elif method == "Gaussian":
-        return np.exp(-(edd - arg2) ** 2. / 2.*arg1 ** 2.)
+        return np.exp(-(edd - arg2) ** 2. / (2.*arg1 ** 2.))
     elif method == "Geo":
         geo_ed, geo_phi_top, geo_phi_bottom, z_new = utl.ReadSimpleFile("Geo17", z, data_path, cols=3, retz=True)
         mean_phi = (geo_phi_top + geo_phi_bottom)/2
@@ -1030,7 +1030,7 @@ def SFR(z,Mstar, method='Tomczak16'):
     elif method == "Carraro20":
         r = np.log10(1+z)
         m = Mstar-9
-        pars = np.array([2.23465429, 0.64417039, 0.90031132, 0.70135795, 0.91893562])
+        pars = np.array([2.29082663, 0.25278264, 0.33402409, 0.63679373, 0.54958314])
         return schreiber(m, r, *pars) + np.random.normal(0., sig, len(Mstar))
 
     else:
