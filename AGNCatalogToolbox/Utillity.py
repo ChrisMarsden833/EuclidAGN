@@ -72,7 +72,16 @@ def ValidatePath(path, ErrorOnFail = False):
         if ErrorOnFail:
             assert False, "{} does not exist, and most likely contains files needed for a successful run".format(path)
         os.mkdir(path)
-    return path 
+    return path
+
+def safe_divide(A, B):
+    assert len(A) == len(B), "Objects have inconsistent lengths len(A)={}, len(B)={}".format(len(A), len(B))
+
+    C = np.zeros_like(A)
+    flag = B != 0
+    C[flag] = A[flag]/B[flag];
+
+    return C
 
 def ReadSimpleFile(string, redshift, path, cols=2, retz=False):
     """Function to find and read a two column CSV (normally data).
@@ -113,6 +122,18 @@ def TestForRequiredVariables(Obj, Names):
     """
     for name in Names:
         assert hasattr(Obj, name), "You need to assign {} first".format(name)
+
+def evenly_spaced(arr):
+    """ Simple function to test if the spacing in an array is even
+
+    :param arr: (numpy) array, the array
+    :return: bool, if the array is evenly spaced or not
+    """
+    diff = arr[1] - arr[0]
+    for x in range(1, len(arr) - 1):
+        if arr[x + 1] - arr[x] != diff:
+            return False
+    return True
 
 def query_yes_no(question, default="yes"):
     """Ask a yes/no question via raw_input() and return their answer.
