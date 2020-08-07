@@ -1,2 +1,8 @@
 **/*.png
 /BigData/*.npy
+*.pdf
+*.pyc
+.DS_Store
+params
+*-checkpoint.ipynb
+settings.json
