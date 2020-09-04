@@ -6,3 +6,5 @@
 params
 *-checkpoint.ipynb
 settings.json
+*.csv
+l_bol.npy
