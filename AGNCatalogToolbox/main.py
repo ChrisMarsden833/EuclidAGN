@@ -347,7 +347,8 @@ def stellar_mass_to_black_hole_mass(stellar_mass,
                                     visual_debugging=False,
                                     erase_debugging_folder=False,
                                     debugging_volume=500 ** 3,
-                                    visual_debugging_path="./figures/"):
+                                    visual_debugging_path="./figures/",
+                                    slope=1.18,norm=8.54):
     """ Function to assign black hole mass from the stellar mass.
 
     :param stellar_mass: array, of stellar masses in log10
@@ -378,9 +379,26 @@ def stellar_mass_to_black_hole_mass(stellar_mass,
             pass
         else:
             assert False, "Unknown Scatter argument {}".format(scatter)
+      
+    elif method == "Davis18":
+       # Davis+18, eq. 3
+       log_black_hole_mass = 7.25 + 3.05 * (stellar_mass - 10.8)
+       log_black_hole_mass += np.random.normal(0., 1.6, len(stellar_mass))
+      
+    elif method == "Sahu19":
+       # Sahu+19, Eq. 11, fig. 11 
+       log_black_hole_mass = 8.02 + 1.65 * (stellar_mass - 10.7)
+       log_black_hole_mass += np.random.normal(0., 1.2, len(stellar_mass))
+      
+    elif method == "Reines&Volonteri15":
+       # Eq. 4,5 and Fig 8 
+       log_black_hole_mass = 7.45 + 1.05 * (stellar_mass - 11.)
+       log_black_hole_mass += np.random.normal(0., 1.1, len(stellar_mass))
 
     elif method == "KormendyHo":
-        log_black_hole_mass = 8.54 + 1.18 * (stellar_mass - 11)
+        #log_black_hole_mass = 8.54 + 1.18 * (stellar_mass - 11) # original equation
+        log_black_hole_mass = norm + slope * (stellar_mass - 11)
+        print(f'Slope of Kormendy relation: {slope}')
         if scatter == "Intrinsic" or scatter == "intrinsic":
             print("Warning - Kormendy and Ho's intrinsic scatter is effectively fixed, with a scale of 0.5")
             scatter = np.random.normal(0, 0.5, len(stellar_mass))
@@ -563,6 +581,8 @@ def black_hole_mass_to_luminosity(black_hole_mass,
     y2edd_bin = interpolate.interp1d(y, edd_bin, bounds_error=False, fill_value=(edd_bin[0], edd_bin[-1]))
     lg_edd = y2edd_bin(a)  # lgedd = np.interp(a, y, edd_bin)  # , right=-99)
     l_bol = lg_edd + l_edd
+    np.save('l_bol.npy',l_bol)
+    print(f'lum_min={np.min(l_bol)}, lum_max={np.max(l_bol)}')
 
     if bol_corr == 'Marconi04':
        #eq 21
@@ -614,7 +634,7 @@ def black_hole_mass_to_luminosity(black_hole_mass,
       lx_final = np.concatenate((lx_final,Lbol1_erg[a]))
       corr_final = np.concatenate((corr_final,bol_corr1[a]))
       # + flat area
-      lx_high = np.arange(start=max(Lbol1_erg),stop=48.6,step=incr)
+      lx_high = np.arange(start=max(Lbol1_erg),stop=52.,step=incr)
       corr_high = 2*np.ones(len(lx_high))
       lbol_final = np.concatenate((lx_final,lx_high))
       corr_final = np.concatenate((corr_final,corr_high))
