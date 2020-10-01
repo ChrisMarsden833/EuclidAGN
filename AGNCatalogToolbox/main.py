@@ -348,7 +348,7 @@ def stellar_mass_to_black_hole_mass(stellar_mass,
                                     erase_debugging_folder=False,
                                     debugging_volume=500 ** 3,
                                     visual_debugging_path="./figures/",
-                                    slope=1.18,norm=8.54):
+                                    slope=3.05,norm=7.25):
     """ Function to assign black hole mass from the stellar mass.
 
     :param stellar_mass: array, of stellar masses in log10
@@ -382,7 +382,8 @@ def stellar_mass_to_black_hole_mass(stellar_mass,
       
     elif method == "Davis18":
        # Davis+18, eq. 3
-       log_black_hole_mass = 7.25 + 3.05 * (stellar_mass - 10.8)
+       # log_black_hole_mass = 7.25 + 3.05 * (stellar_mass - 10.8) # original equation
+       log_black_hole_mass = norm + slope * (stellar_mass - 10.8)
        log_black_hole_mass += np.random.normal(0., 1.6, len(stellar_mass))
       
     elif method == "Sahu19":
@@ -396,8 +397,7 @@ def stellar_mass_to_black_hole_mass(stellar_mass,
        log_black_hole_mass += np.random.normal(0., 1.1, len(stellar_mass))
 
     elif method == "KormendyHo":
-        #log_black_hole_mass = 8.54 + 1.18 * (stellar_mass - 11) # original equation
-        log_black_hole_mass = norm + slope * (stellar_mass - 11)
+        log_black_hole_mass = 8.54 + 1.18 * (stellar_mass - 11) # original equation
         print(f'Slope of Kormendy relation: {slope}')
         if scatter == "Intrinsic" or scatter == "intrinsic":
             print("Warning - Kormendy and Ho's intrinsic scatter is effectively fixed, with a scale of 0.5")
@@ -564,25 +564,28 @@ def black_hole_mass_to_luminosity(black_hole_mass,
     distribution, both as PlottingData objects (see ACTUtillity).
     """
 
-    l_edd = 38.1072 + black_hole_mass
+    l_edd = 38.1072 + black_hole_mass # log(L_Edd) [erg/s]
 
-    edd_bin = np.arange(-4, 0, 0.001)
-    prob_schechter_function = edd_schechter_function(10 ** edd_bin, method=method, arg1=parameter1, arg2=parameter2,
-                                                     redshift_evolution=redshift_evolution, z=z)
-    p = prob_schechter_function * (10**0.0001)
-    r_prob = p[::-1]
-    prob_cum = np.cumsum(r_prob)
-    r_prob_cum = prob_cum[::-1]
-    y = r_prob_cum / r_prob_cum[0]
-    y = y[::-1]
-    edd_bin = edd_bin[::-1]
+    if isinstance(method, (np.floating, float)):
+      l_bol = np.log10(method) + l_edd
+    else:
+      edd_bin = np.arange(-4, 0, 0.001)
+      prob_schechter_function = edd_schechter_function(10 ** edd_bin, method=method, arg1=parameter1, arg2=parameter2,
+                                                      redshift_evolution=redshift_evolution, z=z)
+      p = prob_schechter_function * (10**0.0001)
+      r_prob = p[::-1]
+      prob_cum = np.cumsum(r_prob)
+      r_prob_cum = prob_cum[::-1]
+      y = r_prob_cum / r_prob_cum[0]
+      y = y[::-1]
+      edd_bin = edd_bin[::-1]
 
-    a = np.random.random(len(black_hole_mass))
-    y2edd_bin = interpolate.interp1d(y, edd_bin, bounds_error=False, fill_value=(edd_bin[0], edd_bin[-1]))
-    lg_edd = y2edd_bin(a)  # lgedd = np.interp(a, y, edd_bin)  # , right=-99)
-    l_bol = lg_edd + l_edd
-    np.save('l_bol.npy',l_bol)
-    print(f'lum_min={np.min(l_bol)}, lum_max={np.max(l_bol)}')
+      a = np.random.random(len(black_hole_mass))
+      y2edd_bin = interpolate.interp1d(y, edd_bin, bounds_error=False, fill_value=(edd_bin[0], edd_bin[-1]))
+      lg_edd = y2edd_bin(a)  # lgedd = np.interp(a, y, edd_bin)  # , right=-99)
+      l_bol = lg_edd + l_edd
+      np.save('l_bol.npy',l_bol)
+      print(f'lum_min={np.min(l_bol)}, lum_max={np.max(l_bol)}')
 
     if bol_corr == 'Marconi04':
        #eq 21
@@ -634,7 +637,7 @@ def black_hole_mass_to_luminosity(black_hole_mass,
       lx_final = np.concatenate((lx_final,Lbol1_erg[a]))
       corr_final = np.concatenate((corr_final,bol_corr1[a]))
       # + flat area
-      lx_high = np.arange(start=max(Lbol1_erg),stop=52.,step=incr)
+      lx_high = np.arange(start=max(Lbol1_erg),stop=53.,step=incr)
       corr_high = 2*np.ones(len(lx_high))
       lbol_final = np.concatenate((lx_final,lx_high))
       corr_final = np.concatenate((corr_final,corr_high))
