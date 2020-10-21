@@ -1,4 +1,6 @@
+
 from AGNCatalogToolbox import main as agn
+from AGNCatalogToolbox import Literature
 from colossus.cosmology import cosmology
 import os
 import glob
@@ -31,15 +33,20 @@ cosmo = 'Carraro+20'
 cosmology = cosmology.setCosmology(cosmo)
 volume = 200**3 # Mpc?
 
-
 ################################
 # set simulation parameters
-z = 2.7
+z = 1.
 reds_dic={0.45:0, 1:1, 1.7:2, 2.7:3}
 index=reds_dic.get(z) # needed for IDL data
 
+sub_dir='42_TestSchechter_R&V/'
+sub_dir='43_TestSchechter_Shankar/'
+sub_dir='44_TestGaussian_Shankar/'
+sub_dir='45_TestSchechter_Davis/'
+#sub_dir='46_TestSchechter_Sahu/'
+
 methods={'halo_to_stars':'Grylls19', # 'Grylls19' or 'Moster'
-    'BH_mass_method':"Reines&Volonteri15", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
+    'BH_mass_method':"Davis18", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
     'BH_mass_scatter':"Intrinsic", # "Intrinsic" or float
     'duty_cycle':"Schulze", # "Schulze", "Man16", "Geo" or float (0.18)
     'edd_ratio':"Schechter", # "Schechter", "PowerLaw", "Gaussian", "Geo"
@@ -47,6 +54,19 @@ methods={'halo_to_stars':'Grylls19', # 'Grylls19' or 'Moster'
     'SFR':'Carraro20' # 'Tomczak16', "Schreiber15", "Carraro20"
     }
 
+# looping on:
+if methods['edd_ratio']=="Schechter":
+   # variable_name = r"$\lambda$"
+   # par_str= 'lambda'
+   variable_name = r"$\alpha$"
+   par_str= 'alpha'
+elif methods['edd_ratio']=="Gaussian":
+   variable_name = r"$\sigma$"
+   par_str= 'sigma'
+   #variable_name = r"$\mu$"
+   #par_str= 'mean'
+#parameters = [0.05,0.1,0.2,0.3,0.6]
+parameters = [-0.2,-0.1,0.05]
 
 ################################
 # Edd ratio parameters definition:
@@ -69,6 +89,22 @@ if methods['edd_ratio']=='Schechter' and (methods['duty_cycle']=="Schulze" or me
     alpha_z=alpha_pol(z)
     lambda_z=lambda_pol(z)
 
+    alpha_z=-0.5
+    lambda_z=-0.1
+
+if z==1 and methods['edd_ratio']=='Schechter' and (methods['duty_cycle']=="Schulze" or methods['duty_cycle']=="Geo") and (methods['BH_mass_method']=="Reines&Volonteri15"):
+    # parameters found by testing, see folder 42_TestSchechter_R&V
+    alpha_z=1.2
+    lambda_z=10
+
+if z==2.7 and methods['edd_ratio']=='Schechter' and (methods['duty_cycle']=="Schulze" or methods['duty_cycle']=="Geo") and (methods['BH_mass_method']=="Reines&Volonteri15"):
+    # sucks
+    # parameters found by testing, see folder 42_TestSchechter_R&V
+    #alpha_z=5
+    #lambda_z=8
+    alpha_z=-0.5
+    lambda_z=-0.2
+
 # Schechter P(lambda), z=1, duty cycle di Schulze + 2015 usando la relazione Mstar-Mbh di K&H +2013 :
 if methods['edd_ratio']=='Schechter' and methods['duty_cycle']=="Schulze" and methods['BH_mass_method']=="KormendyHo":
     lambda_z = -0.4
@@ -80,13 +116,16 @@ if z==1 and methods['edd_ratio']=='Schechter' and methods['duty_cycle']==0.18 an
     alpha_z = 1.2
 
 if methods['edd_ratio']=='Gaussian':
-    lambda_z = 0.2 # sigma
-    alpha_z = 0.4 # mean edd
+    sigma_z = 0.05 # sigma
+    mu_z = 0.25 # mean edd
 
 #if methods['BH_mass_method']=="Davis18":
 #    slope=1.
 
-print(f'lambda_z={lambda_z}, alpha_z={alpha_z}')
+if methods['edd_ratio']=="Schechter":
+   print(f'lambda_z={lambda_z}, alpha_z={alpha_z}')
+elif methods['edd_ratio']=="Gaussian":
+   print(f'sigma={sigma_z}, mu_z={mu_z}')
 
 
 ################################
@@ -129,7 +168,6 @@ print(gals.stellar_mass.min(),gals.stellar_mass.max())
 gals['black_hole_mass'] = agn.stellar_mass_to_black_hole_mass(gals.stellar_mass, method = methods['BH_mass_method'], 
                                                                                 scatter = methods['BH_mass_scatter'],)#slope=slope,norm=norm
 
-##########
 plt.figure()
 # XLF Data
 print('z=',z)
@@ -138,28 +176,49 @@ mXLF_data = XLF.get_miyaji2015()
 plt.plot(mXLF_data.x, mXLF_data.y, 'o', label = "Miyaji")
 uXLF_data = XLF.get_ueda14(np.arange(42, 46, 0.1))
 plt.plot(uXLF_data.x, uXLF_data.y, ':', label = "Ueda")
-#########
 
-# Duty cycles
-gals['duty_cycle'] = agn.to_duty_cycle(methods['duty_cycle'], gals.stellar_mass, gals.black_hole_mass, z)
+for par in parameters:
+   if par_str == 'lambda':
+      lambda_z=par
+   elif par_str == 'alpha':
+      alpha_z=par
 
-#gals['luminosity'] = agn.black_hole_mass_to_luminosity(gals.black_hole_mass, gals.duty_cycle, gals.stellar_mass, z, methods['edd_ratio'],
-#                                        bol_corr=methods['bol_corr'], parameter1=lambda_z, parameter2=alpha_z)
-gals['luminosity'], XLF_plotting_data, _ = agn.black_hole_mass_to_luminosity(gals.black_hole_mass, 
-                                          gals.duty_cycle, gals.stellar_mass, z, methods['edd_ratio'], return_plotting_data=True,
+   # copy df
+   gals_tmp= gals.copy()
+
+   # Duty cycles
+   gals_tmp['duty_cycle'] = agn.to_duty_cycle(methods['duty_cycle'], gals_tmp.stellar_mass, gals_tmp.black_hole_mass, z, suppress_output=True)
+
+   gals_tmp['luminosity'], XLF_plotting_data, _ = agn.black_hole_mass_to_luminosity(gals_tmp.black_hole_mass, 
+                                          gals_tmp.duty_cycle, gals_tmp.stellar_mass, z, methods['edd_ratio'], return_plotting_data=True,
                                           bol_corr=methods['bol_corr'], parameter1=lambda_z, parameter2=alpha_z)
                                           #bol_corr=methods['bol_corr'], parameter1=sigma_z, parameter2=mu_z)
    
-# do squared distance from Miyaji
-XLF_plot_int=interpolate.interp1d(10**XLF_plotting_data.x, 10**XLF_plotting_data.y)
-good_ones=np.logical_and((mXLF_data.x>=10**XLF_plotting_data.x[0]), (mXLF_data.x<=10**XLF_plotting_data.x[-1]))
-mXLF_x=mXLF_data.x[good_ones]
-XLF_sim=XLF_plot_int(mXLF_x)
-S=np.sum((XLF_sim-mXLF_data.y[good_ones])**2)
-print(f'squares sum for {par_str}={par}:\t{S}')
+   # plot XLF
+   #try:
+   plt.plot(10**XLF_plotting_data.x, 10**XLF_plotting_data.y, label = r"{} = {}".format(variable_name, par))
+   #except:
+   #   print('passing XLF plotting')
+   #   pass
 
-# plot XLF
-plt.plot(10**XLF_plotting_data.x, 10**XLF_plotting_data.y, label = r"{} = {}".format(variable_name, par))# finish plot
+   """
+   # do squared distance from Miyaji
+   XLF_plot_int=interpolate.interp1d(10**XLF_plotting_data.x, 10**XLF_plotting_data.y)
+   good_ones=np.logical_and((mXLF_data.x>=10**XLF_plotting_data.x[0]), (mXLF_data.x<=10**XLF_plotting_data.x[-1]))
+   mXLF_x=mXLF_data.x[good_ones]
+   XLF_sim=XLF_plot_int(mXLF_x)
+   S=np.sum((XLF_sim-mXLF_data.y[good_ones])**2)
+   print(f'squares sum for {par_str}={par}:\t{S}')
+   """
+
+   #gals_tmp['nh'] = agn.luminosity_to_nh(gals_tmp.luminosity, z)
+   #gals_tmp['agn_type'] = agn.nh_to_type(gals_tmp.nh)
+
+   gals_tmp['SFR'] = agn.SFR(z,gals_tmp.stellar_mass,methods['SFR'])
+   gals_tmp['lx/SFR'] = (gals_tmp.luminosity-42)-gals_tmp.SFR
+
+
+# finish plot
 plt.xlabel(r'$L_x\;[erg\;s^{-1}]$')
 plt.ylabel(r'$d\phi /d(log\;L_x)\;[Mpc^{-3}]$')
 plt.loglog()
@@ -181,25 +240,20 @@ elif methods['edd_ratio']=="Gaussian":
 plt.title(title_str)
 plt.savefig(file_name, format = 'pdf', bbox_inches = 'tight',transparent=True)
 #plt.show()
-                                        
-gals['nh'] = agn.luminosity_to_nh(gals.luminosity, z)
-gals['agn_type'] = agn.nh_to_type(gals.nh)
-
-gals['SFR'] = agn.SFR(z,gals.stellar_mass,methods['SFR'])
-gals['lx/SFR'] = (gals.luminosity-42)-gals.SFR
+#print(gals.describe())
 
 ################################
 # grouping in mass bins - log units
-grouped_gals = gals[['stellar_mass','luminosity','SFR','lx/SFR']].groupby(pd.cut(gals.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+grouped_gals = gals_tmp[['stellar_mass','luminosity','SFR','lx/SFR']].groupby(pd.cut(gals_tmp.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
 
 # converting to linear units
 gals_lin=pd.DataFrame()
-gals_lin['stellar_mass'] = gals['stellar_mass']
-gals_lin['luminosity']= 10**(gals.luminosity-42)
-gals_lin[['SFR','lx/SFR']]=10**gals[['SFR','lx/SFR']]
+gals_lin['stellar_mass'] = gals_tmp['stellar_mass']
+gals_lin['luminosity']= 10**(gals_tmp.luminosity-42)
+gals_lin[['SFR','lx/SFR']]=10**gals_tmp[['SFR','lx/SFR']]
 
 # grouping linear table
-grouped_lin = gals_lin[['stellar_mass','luminosity','SFR','lx/SFR']].groupby(pd.cut(gals.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+grouped_lin = gals_lin[['stellar_mass','luminosity','SFR','lx/SFR']].groupby(pd.cut(gals_tmp.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
 # limit to logM>9
 ggals_lin=grouped_lin[grouped_lin['stellar_mass',0.5] > 9]
 grouped_lin.index.rename('mass_range',inplace=True)
@@ -231,13 +285,14 @@ bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8
                                   index=bs_perc.index, columns=pd.MultiIndex.from_product([['SFR'],perc_colnames])))
 bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs['luminosity']]), 
                                   index=bs_perc.index, columns=pd.MultiIndex.from_product([['luminosity'],perc_colnames])))
-bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row['luminosity']/row['SFR'],[0.05,0.1585,0.5,0.8415,0.95]) for i,row in gals_bs.iterrows()]), 
+bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row['luminosity']/row['SFR'],[0.05,0.1585,0.5,0.8415,0.95]) 
+                                             for i,row in gals_bs.iterrows()]), 
                                   index=bs_perc.index, columns=pd.MultiIndex.from_product([['lx_SFR'],perc_colnames])))
 #print(bs_perc)
 
 # save dataframe to file and add to dictionary for use
-bs_perc.to_csv(curr_dir+f'/Ros_plots/bs_perc_z{z}.csv')
-
+bs_perc.to_csv(curr_dir+'/Ros_plots/'+sub_dir+f'bs_perc_z{z}.csv')
+df_dict[par_str+f'{par}']=bs_perc
 
 ################################
 ## Plot ##
@@ -335,7 +390,7 @@ def comp_plot(df_dic,method_legend,filename='Comparisons',leg_title=None):
     ax.set_xlabel('M$_*$ (M$_\odot$)')
     ax.set_ylabel('L$_X$ (2-10 keV) / $10^{42}$ (erg/s)')
     ax.legend(loc='lower right',title=leg_title)
-    plt.savefig(curr_dir+'/Ros_plots/'+filename+f'_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) ;
+    plt.savefig(curr_dir+'/Ros_plots/'+sub_dir+filename+f'_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) ;
     return
 
 ################################
@@ -373,4 +428,4 @@ plt.yscale('log')
 plt.xlabel('SFR (M$_\odot$/yr)')
 plt.ylabel('L$_X$ (2-10 keV) / $10^{42}$ (erg/s)')
 plt.legend(loc='upper left');
-plt.savefig(curr_dir+f'/Ros_plots/SFvsLX_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
+plt.savefig(curr_dir+'/Ros_plots/'+sub_dir+f'SFvsLX_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
