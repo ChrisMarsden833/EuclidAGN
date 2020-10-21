@@ -8,3 +8,6 @@ params
 settings.json
 *.csv
 l_bol.npy
+*.txt
+*.pyc
+*.insyncdl
