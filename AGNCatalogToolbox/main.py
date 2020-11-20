@@ -1,6 +1,5 @@
 # Common
 import numpy as np
-import sys
 from matplotlib import pyplot as plt
 from scipy import stats
 from scipy import interpolate
@@ -8,6 +7,7 @@ from multiprocessing import Process, Value, Array, Pool
 import multiprocessing
 import time
 import pandas as pd
+from scipy.integrate import quad
 
 # Specialized
 from colossus.lss import mass_function
@@ -338,7 +338,9 @@ def halo_mass_to_stellar_mass(halo_mass,
         print("Writing file: {}".format(save_path))
         plt.savefig(save_path)
         plt.close()
-
+ 
+    if formula == "Grylls19":
+       internal_stellar_mass - 0.1
     return internal_stellar_mass
 
 def stellar_mass_to_black_hole_mass(stellar_mass,
@@ -513,7 +515,7 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
 def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshift_evolution=False, z=0, data_path="./Data/"):
     #gammaE = arg2
     #A = 10. ** (-1.41)
-    prob = ((edd / (10. ** arg1)) ** arg2)
+    #prob = ((edd / (10. ** arg1)) ** arg2)
 
     if redshift_evolution:
         gammaz = 3.47
@@ -521,11 +523,32 @@ def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshif
         prob *= ((1. + z) / (1. + z0)) ** gammaz
 
     if method == "Schechter":
-        return prob * np.exp(-(edd / (10. ** arg1)))
+        #return prob * np.exp(-(edd / (10. ** arg1)))
+        def Schechter(x,llambda,alpha):
+           #return ((10**x / (10. ** llambda)) ** alpha)* np.exp(-(10**x / (10. ** llambda)))
+           return 10.**(alpha*(x-llambda))*np.exp(-10.**(x-llambda))
+
+        norm_fac=quad(Schechter, np.min(edd), np.max(edd), args=(arg1,arg2))
+
+        # plot schechter and cumulative
+        #plt.figure()
+        #plt.yscale('log')
+        #plt.plot(edd,Schechter(edd,arg1,arg2))
+        #plt.plot(edd,(((10.**edd) / (10. ** arg1)) ** arg2)* np.exp(-((10.**edd) / (10. ** arg1))))
+        #plt.plot(edd,np.cumsum(Schechter(edd,arg1,arg2)/norm_fac[0]*(edd[1]-edd[0])))
+        #plt.show()
+
+        return Schechter(edd,arg1,arg2)/norm_fac[0]
     elif method == "PowerLaw":
         return prob
     elif method == "Gaussian":
-        return np.exp(-(edd - arg2) ** 2. / (2.*arg1 ** 2.))
+        def Gaussian(x,sigma,mean):
+           return np.exp(-(10**x - mean) ** 2. / (2.*sigma ** 2.))
+
+        norm_fac=quad(Gaussian, np.min(edd), np.max(edd), args=(arg1,arg2))
+
+        return Gaussian(edd,arg1,arg2)/norm_fac[0]
+        #return np.exp(-(edd - arg2) ** 2. / (2.*arg1 ** 2.))
     elif method == "Geo":
         geo_ed, geo_phi_top, geo_phi_bottom, z_new = utl.ReadSimpleFile("Geo17", z, data_path, cols=3, retz=True)
         mean_phi = (geo_phi_top + geo_phi_bottom)/2
@@ -569,23 +592,28 @@ def black_hole_mass_to_luminosity(black_hole_mass,
     if isinstance(method, (np.floating, float)):
       l_bol = np.log10(method) + l_edd
     else:
-      edd_bin = np.arange(-4, 0, 0.001)
-      prob_schechter_function = edd_schechter_function(10 ** edd_bin, method=method, arg1=parameter1, arg2=parameter2,
+      binning=0.001
+      edd_bin = np.arange(-4, 0, binning)
+      #prob_schechter_function = edd_schechter_function(10 ** edd_bin, method=method, arg1=parameter1, arg2=parameter2,
+      prob_schechter_function = edd_schechter_function(edd_bin, method=method, arg1=parameter1, arg2=parameter2,
                                                       redshift_evolution=redshift_evolution, z=z)
-      p = prob_schechter_function * (10**0.0001)
-      r_prob = p[::-1]
-      prob_cum = np.cumsum(r_prob)
-      r_prob_cum = prob_cum[::-1]
-      y = r_prob_cum / r_prob_cum[0]
-      y = y[::-1]
-      edd_bin = edd_bin[::-1]
+      #p = prob_schechter_function * (10**0.0001)
+      #r_prob = p[::-1]
+      #prob_cum = np.cumsum(r_prob)
+      #r_prob_cum = prob_cum[::-1]
+      #y = r_prob_cum / r_prob_cum[0]
+      #y = y[::-1]
+      #edd_bin = edd_bin[::-1]
+      y=np.cumsum(prob_schechter_function*binning) # Pn(x)*dlog(x)
+      if (y[-1] >1.01) or (y[-1]<0.99):
+         print(f'ATTENTION!!! Normalization went wrong, cumulative goes up to {y[-1]} instead of 1')
 
       a = np.random.random(len(black_hole_mass))
       y2edd_bin = interpolate.interp1d(y, edd_bin, bounds_error=False, fill_value=(edd_bin[0], edd_bin[-1]))
       lg_edd = y2edd_bin(a)  # lgedd = np.interp(a, y, edd_bin)  # , right=-99)
       l_bol = lg_edd + l_edd
-      np.save('l_bol.npy',l_bol)
-      print(f'lum_min={np.min(l_bol)}, lum_max={np.max(l_bol)}')
+      #np.save('l_bol.npy',l_bol)
+      #print(f'lum_min={np.min(l_bol)}, lum_max={np.max(l_bol)}')
 
     if bol_corr == 'Marconi04':
        #eq 21
