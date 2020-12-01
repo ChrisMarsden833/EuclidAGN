@@ -1,10 +1,10 @@
-# set pars for sahu, gaussian varying sigma with mean=0.25
+# set pars for z=0.45, sahu, log gaussian varying mean with sigma=0.3dex
 
 import numpy as np
 
 ################################
 # set simulation parameters
-z = 2.7
+z = 0.45
 reds_dic={0.45:0, 1:1, 1.7:2, 2.7:3}
 index=reds_dic.get(z) # needed for IDL data
 
@@ -24,12 +24,11 @@ if methods['edd_ratio']=="Schechter":
    #variable_name = r"$\alpha$"
    #par_str= 'alpha'
 elif methods['edd_ratio']=="Gaussian":
-   variable_name = r"$\sigma$"
-   par_str= 'sigma'
-   #variable_name = r"$\mu$"
-   #par_str= 'mean'
-#parameters = [0.05,0.1,0.2,0.3,0.6]
-parameters = [.1,.2,.4,.6,.8]
+   #variable_name = r"$\sigma$"
+   #par_str= 'sigma'
+   variable_name = r"$\mu$"
+   par_str= 'mean'
+parameters = [-3.9,-3.5,-3.0,-2.5]
 
 ################################
 # Edd ratio parameters definition:
@@ -79,7 +78,7 @@ if z==1 and methods['edd_ratio']=='Schechter' and methods['duty_cycle']==0.18 an
     alpha_z = 1.2
 
 if methods['edd_ratio']=='Gaussian':
-    sigma_z = 0.05 # sigma
+    sigma_z = 0.3 # sigma
     mu_z = 0.25 # mean edd
 
 #if methods['BH_mass_method']=="Davis18":
@@ -107,4 +106,4 @@ elif methods['BH_mass_method']=="Sahu19":
     M_sup=12.15
 elif methods['BH_mass_method']=="Reines&Volonteri15":
     M_inf=10.
-#print(M_inf,M_sup)
+print(M_inf,M_sup)
