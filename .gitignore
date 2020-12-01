@@ -11,3 +11,5 @@ l_bol.npy
 *test.txt
 *.pyc
 *.insyncdl
+*.bak
+*.pyc
