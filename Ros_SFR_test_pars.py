@@ -49,10 +49,12 @@ volume = 200**3 # Mpc?
 
 ################################
 # import simulation parameters
-sub_dir='Sahu_Gaussian/' # z=1: pars1 mu=0.25, pars2 m=0.025. z=2.7 :pars3 mu=0.25, 
+sub_dir='Sahu_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3 
+#sub_dir='R&V_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3 
+sub_dir= 'R&V_Schechter/' # z=1: pars1. 
 sys.path.append(curr_dir+'/Ros_plots/'+sub_dir)
 
-from pars5 import *
+from pars7 import *
 
 if methods['edd_ratio']=='Gaussian':
    lambda_z=sigma_z
@@ -81,7 +83,12 @@ print(gals.stellar_mass.min(),gals.stellar_mass.max())
 gals['black_hole_mass'] = agn.stellar_mass_to_black_hole_mass(gals.stellar_mass, method = methods['BH_mass_method'], 
                                                                                 scatter = methods['BH_mass_scatter'],)#slope=slope,norm=norm
 
-# import data for plot
+# Duty cycles
+gals['duty_cycle'] = agn.to_duty_cycle(methods['duty_cycle'], gals.stellar_mass, gals.black_hole_mass, z, suppress_output=True)
+
+
+###############
+# plot XLF
 plt.figure()
 # XLF Data
 print('z=',z)
@@ -94,17 +101,15 @@ plt.plot(uXLF_data.x, uXLF_data.y, ':', label = "Ueda")
 for par in parameters:
    if (par_str == 'lambda') or (par_str == 'sigma'):
       lambda_z=par
-   elif (par_str == 'alpha') or (par_str == 'mu_z'):
+   elif (par_str == 'alpha') or (par_str == 'mean'):
       alpha_z=par
 
    # copy df
    gals_tmp= gals.copy()
 
-   # Duty cycles
-   gals_tmp['duty_cycle'] = agn.to_duty_cycle(methods['duty_cycle'], gals_tmp.stellar_mass, gals_tmp.black_hole_mass, z, suppress_output=True)
-
    #gals_tmp['luminosity'] = agn.black_hole_mass_to_luminosity(gals_tmp.black_hole_mass, 
-   gals_tmp['luminosity'], XLF_plotting_data, _ = agn.black_hole_mass_to_luminosity(gals_tmp.black_hole_mass, 
+   gals_tmp['luminosity'], XLF_plotting_data, _, lambda_car = agn.black_hole_mass_to_luminosity(
+                                          gals_tmp.black_hole_mass, 
                                           gals_tmp.duty_cycle, gals_tmp.stellar_mass, z, methods['edd_ratio'], return_plotting_data=True,
                                           bol_corr=methods['bol_corr'], parameter1=lambda_z, parameter2=alpha_z)
                                           #bol_corr=methods['bol_corr'], parameter1=sigma_z, parameter2=mu_z)
@@ -121,12 +126,12 @@ for par in parameters:
    good_ones=np.logical_and((mXLF_data.x>=10**XLF_plotting_data.x[0]), (mXLF_data.x<=10**XLF_plotting_data.x[-1]))
    mXLF_x=mXLF_data.x[good_ones]
    XLF_sim=XLF_plot_int(mXLF_x)
-   S=np.sum((XLF_sim-mXLF_data.y[good_ones])**2)
-   print(f'squares sum for lambda{lambda_z}_alpha{alpha_z}:\t{S}')
+   S=np.sum((np.log10(XLF_sim)-np.log10(mXLF_data.y[good_ones]))**2)
+   print(f'lambda{lambda_z}_alpha{alpha_z}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
    if methods['edd_ratio']=="Schechter":
-      append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'Squares sum for z={z}, lambda={lambda_z}, alpha={alpha_z}:\t{S}')
+      append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, lambda={lambda_z}, alpha={alpha_z}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
    elif methods['edd_ratio']=="Gaussian":
-      append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'Squares sum for z={z}, mean={alpha_z}, sigma={lambda_z}:\t{S}')
+      append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, mean={alpha_z}, sigma={lambda_z}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
 
    #gals_tmp['nh'] = agn.luminosity_to_nh(gals_tmp.luminosity, z)
    #gals_tmp['agn_type'] = agn.nh_to_type(gals_tmp.nh)

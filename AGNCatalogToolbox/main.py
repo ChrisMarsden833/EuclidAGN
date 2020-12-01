@@ -543,7 +543,7 @@ def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshif
         return prob
     elif method == "Gaussian":
         def Gaussian(x,sigma,mean):
-           return np.exp(-(10**x - mean) ** 2. / (2.*sigma ** 2.))
+           return np.exp(-(x - mean) ** 2. / (2.*sigma ** 2.))
 
         norm_fac=quad(Gaussian, np.min(edd), np.max(edd), args=(arg1,arg2))
 
@@ -607,6 +607,10 @@ def black_hole_mass_to_luminosity(black_hole_mass,
       y=np.cumsum(prob_schechter_function*binning) # Pn(x)*dlog(x)
       if (y[-1] >1.01) or (y[-1]<0.99):
          print(f'ATTENTION!!! Normalization went wrong, cumulative goes up to {y[-1]} instead of 1')
+      
+      # characteristic lambda
+      lambda_car=np.cumsum(prob_schechter_function*edd_bin*binning) # Pn(x)*log(x)*dlog(x)
+      #print(f'characteristic log(lambda) for this eddington distribution: {lambda_car[-1]:.2f}')
 
       a = np.random.random(len(black_hole_mass))
       y2edd_bin = interpolate.interp1d(y, edd_bin, bounds_error=False, fill_value=(edd_bin[0], edd_bin[-1]))
@@ -688,7 +692,7 @@ def black_hole_mass_to_luminosity(black_hole_mass,
        assert False, "Bolometric correction is unknown"
 
     if not return_plotting_data:
-        return luminosity
+        return luminosity, lambda_car[-1]
 
     # Save Luminosity Function Data
     step = 0.1
@@ -711,7 +715,7 @@ def black_hole_mass_to_luminosity(black_hole_mass,
 
     edd_plotting_data = (utl.PlottingData(edd_bin, np.log10(prob_derived)))
 
-    return luminosity, xlf_plotting_data, edd_plotting_data
+    return luminosity, xlf_plotting_data, edd_plotting_data, lambda_car[-1]
 
 def generate_nh_distribution(lg_luminosity, z, lg_nh):
     """ Function written by Viola to generate (I think) a distribution of nh values for the appropriate luminosity.

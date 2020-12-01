@@ -1,6 +1,8 @@
 from AGNCatalogToolbox import main as agn
+from AGNCatalogToolbox import Literature
 from colossus.cosmology import cosmology
 import os
+import sys
 import glob
 import numpy as np
 import pandas as pd
@@ -10,6 +12,18 @@ from scipy import interpolate
 
 curr_dir=os.getcwd()
 
+def append_new_line(file_name, text_to_append):
+    """Append given text as a new line at the end of file"""
+    # Open the file in append & read mode ('a+')
+    with open(file_name, "a+") as file_object:
+        # Move read cursor to the start of file.
+        file_object.seek(0)
+        # If file is not empty then append '\n'
+        data = file_object.read(100)
+        if len(data) > 0:
+            file_object.write("\n")
+        # Append text at the end of file
+        file_object.write(text_to_append)
 
 ################################
 # import data from IDL
@@ -31,81 +45,20 @@ cosmo = 'Carraro+20'
 cosmology = cosmology.setCosmology(cosmo)
 volume = 200**3 # Mpc?
 
-
 ################################
-# set simulation parameters
-z = 2.7
-reds_dic={0.45:0, 1:1, 1.7:2, 2.7:3}
-index=reds_dic.get(z) # needed for IDL data
+# import simulation parameters
+sub_dir='Sahu_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3 
+#sub_dir='R&V_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3 
+sub_dir= 'R&V_Schechter/' # z=1: pars1. 
+sub_dir= 'Standard/'
+sub_dir= 'Scaling_rels/'
+sys.path.append(curr_dir+'/Ros_plots/'+sub_dir)
 
-methods={'halo_to_stars':'Grylls19', # 'Grylls19' or 'Moster'
-    'BH_mass_method':"Reines&Volonteri15", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
-    'BH_mass_scatter':"Intrinsic", # "Intrinsic" or float
-    'duty_cycle':"Schulze", # "Schulze", "Man16", "Geo" or float (0.18)
-    'edd_ratio':"Schechter", # "Schechter", "PowerLaw", "Gaussian", "Geo"
-    'bol_corr':'Lusso12_modif', # 'Duras20', 'Marconi04', 'Lusso12_modif'
-    'SFR':'Carraro20' # 'Tomczak16', "Schreiber15", "Carraro20"
-    }
-
-
-################################
-# Edd ratio parameters definition:
-if methods['edd_ratio']=='Schechter' and (methods['duty_cycle']=="Schulze" or methods['duty_cycle']=="Geo") and (methods['BH_mass_method']=="Shankar16" or methods['BH_mass_method']=="Davis18" or methods['BH_mass_method']=="Sahu19" or methods['BH_mass_method']=="Reines&Volonteri15"):
-    #fitting:
-    #redshift = [0.1, 1, 2]
-    #alpha = [-0.25,1.6,7.14]
-    #lambd = [0.05, -0.8,-0.5]
-    #alpha_pars=np.polyfit(redshift,alpha,2)
-    #lambda_pars=np.polyfit(redshift,lambd,2)
-    #np.savez('schechter_pars.npz',alpha_pars=alpha_pars,lambda_pars=lambda_pars)
-
-    schechter_pars=np.load('schechter_pars.npz')
-    alpha_pars=schechter_pars['alpha_pars']
-    lambda_pars=schechter_pars['lambda_pars']
-
-    alpha_pol=np.poly1d(alpha_pars)
-    lambda_pol=np.poly1d(lambda_pars)
-
-    alpha_z=alpha_pol(z)
-    lambda_z=lambda_pol(z)
-
-# Schechter P(lambda), z=1, duty cycle di Schulze + 2015 usando la relazione Mstar-Mbh di K&H +2013 :
-if methods['edd_ratio']=='Schechter' and methods['duty_cycle']=="Schulze" and methods['BH_mass_method']=="KormendyHo":
-    lambda_z = -0.4
-    alpha_z = 0
-
-# Schechter P(lambda), z=1, duty cycle costante e uguale a 0.18 usando la relazione Mstar-Mbh di Shankar + 16:
-if z==1 and methods['edd_ratio']=='Schechter' and methods['duty_cycle']==0.18 and methods['BH_mass_method']=="Shankar16":
-    lambda_z = -1
-    alpha_z = 1.2
+from pars1 import *
 
 if methods['edd_ratio']=='Gaussian':
-    lambda_z = 0.2 # sigma
-    alpha_z = 0.4 # mean edd
-
-#if methods['BH_mass_method']=="Davis18":
-#    slope=1.
-
-print(f'lambda_z={lambda_z}, alpha_z={alpha_z}')
-
-
-################################
-# mass range restrictions
-M_inf=0
-M_sup=0
-if z==2.7:
-    M_inf=10.
-elif methods['BH_mass_method']=="Shankar16":
-    M_inf=10
-#elif methods['BH_mass_method']=="Davis18":
-#    M_inf=10.3
-#    M_sup=11.4
-#elif methods['BH_mass_method']=="Sahu19":
-#    M_inf=10.
-#ß    M_sup=12.15
-#elif methods['BH_mass_method']=="Reines&Volonteri15":
-#    M_inf=10.
-print(M_inf,M_sup)
+   lambda_z=sigma_z
+   alpha_z=mu_z
 
 ################################
 ## Generate universe ##
@@ -129,7 +82,19 @@ print(gals.stellar_mass.min(),gals.stellar_mass.max())
 gals['black_hole_mass'] = agn.stellar_mass_to_black_hole_mass(gals.stellar_mass, method = methods['BH_mass_method'], 
                                                                                 scatter = methods['BH_mass_scatter'],)#slope=slope,norm=norm
 
-##########
+# Duty cycles
+gals['duty_cycle'] = agn.to_duty_cycle(methods['duty_cycle'], gals.stellar_mass, gals.black_hole_mass, z)
+
+#gals['luminosity'] = agn.black_hole_mass_to_luminosity(gals.black_hole_mass, gals.duty_cycle, gals.stellar_mass, z, methods['edd_ratio'],
+#                                        bol_corr=methods['bol_corr'], parameter1=lambda_z, parameter2=alpha_z)
+gals['luminosity'], XLF_plotting_data, _, lambda_car = agn.black_hole_mass_to_luminosity(
+                                          gals.black_hole_mass, 
+                                          gals.duty_cycle, gals.stellar_mass, z, methods['edd_ratio'], return_plotting_data=True,
+                                          bol_corr=methods['bol_corr'], parameter1=lambda_z, parameter2=alpha_z)
+                                          #bol_corr=methods['bol_corr'], parameter1=sigma_z, parameter2=mu_z)
+
+###############
+# plot XLF
 plt.figure()
 # XLF Data
 print('z=',z)
@@ -138,52 +103,39 @@ mXLF_data = XLF.get_miyaji2015()
 plt.plot(mXLF_data.x, mXLF_data.y, 'o', label = "Miyaji")
 uXLF_data = XLF.get_ueda14(np.arange(42, 46, 0.1))
 plt.plot(uXLF_data.x, uXLF_data.y, ':', label = "Ueda")
-#########
 
-# Duty cycles
-gals['duty_cycle'] = agn.to_duty_cycle(methods['duty_cycle'], gals.stellar_mass, gals.black_hole_mass, z)
-
-#gals['luminosity'] = agn.black_hole_mass_to_luminosity(gals.black_hole_mass, gals.duty_cycle, gals.stellar_mass, z, methods['edd_ratio'],
-#                                        bol_corr=methods['bol_corr'], parameter1=lambda_z, parameter2=alpha_z)
-gals['luminosity'], XLF_plotting_data, _ = agn.black_hole_mass_to_luminosity(gals.black_hole_mass, 
-                                          gals.duty_cycle, gals.stellar_mass, z, methods['edd_ratio'], return_plotting_data=True,
-                                          bol_corr=methods['bol_corr'], parameter1=lambda_z, parameter2=alpha_z)
-                                          #bol_corr=methods['bol_corr'], parameter1=sigma_z, parameter2=mu_z)
-   
-# do squared distance from Miyaji
-XLF_plot_int=interpolate.interp1d(10**XLF_plotting_data.x, 10**XLF_plotting_data.y)
-good_ones=np.logical_and((mXLF_data.x>=10**XLF_plotting_data.x[0]), (mXLF_data.x<=10**XLF_plotting_data.x[-1]))
-mXLF_x=mXLF_data.x[good_ones]
-XLF_sim=XLF_plot_int(mXLF_x)
-S=np.sum((XLF_sim-mXLF_data.y[good_ones])**2)
-print(f'squares sum for {par_str}={par}:\t{S}')
-
-# plot XLF
-plt.plot(10**XLF_plotting_data.x, 10**XLF_plotting_data.y, label = r"{} = {}".format(variable_name, par))# finish plot
+plt.plot(10**XLF_plotting_data.x, 10**XLF_plotting_data.y, label = 'Simulation')# finish plot
 plt.xlabel(r'$L_x\;[erg\;s^{-1}]$')
 plt.ylabel(r'$d\phi /d(log\;L_x)\;[Mpc^{-3}]$')
 plt.loglog()
 plt.legend()
 if methods['edd_ratio']=="Schechter":
-   if par_str == 'lambda':
-      title_str=r'XLF, U={}, $\alpha$={}, z={}'.format(methods['duty_cycle'],alpha_z,z)
-      file_name=curr_dir+'/Ros_plots/'+sub_dir+f'XLF_z{z}_alpha{alpha_z}'+par_str+'.pdf'
-   elif par_str == 'alpha':
-      title_str=r'XLF, U={}, $\lambda$={}, z={}'.format(methods['duty_cycle'],lambda_z,z)
-      file_name=curr_dir+'/Ros_plots/'+sub_dir+f'XLF_z{z}_lambda{lambda_z}'+par_str+'.pdf'
+   title_str=r'XLF, U={}, $\alpha$={:.2f}, $\lambda$={:.2f}, z={}'.format(methods['duty_cycle'],alpha_z,lambda_z,z)
+   file_name=curr_dir+'/Ros_plots/'+sub_dir+f'XLF_z{z}_alpha{alpha_z:.2f}_lambda{lambda_z:.2f}.pdf'
 elif methods['edd_ratio']=="Gaussian":
-   if par_str == 'sigma':
-      title_str=r'XLF, U={}, $\mu$={}, z={}'.format(methods['duty_cycle'],mu_z,z)
-      file_name=curr_dir+'/Ros_plots/'+sub_dir+f'XLF_z{z}_mean{mu_z}'+par_str+'.pdf'
-   elif par_str == 'mean':
-      title_str=r'XLF, U={}, $\sigma$={}, z={}'.format(methods['duty_cycle'],sigma_z,z)
-      file_name=curr_dir+'/Ros_plots/'+sub_dir+f'XLF_z{z}_sigma{sigma_z}'+par_str+'.pdf'
+   title_str=r'XLF, U={}, $\mu$={}, $\sigma$={}, z={}'.format(methods['duty_cycle'],mu_z,sigma_z,z)
+   file_name=curr_dir+'/Ros_plots/'+sub_dir+f'XLF_z{z}_mean{mu_z:.2f}_sigma{sigma_z:.2f}.pdf'
 plt.title(title_str)
 plt.savefig(file_name, format = 'pdf', bbox_inches = 'tight',transparent=True)
 #plt.show()
+#################
+# do squared distance from Miyaji
+XLF_plot_int=interpolate.interp1d(10**XLF_plotting_data.x, 10**XLF_plotting_data.y)
+good_ones=np.logical_and((mXLF_data.x>=10**XLF_plotting_data.x[0]), (mXLF_data.x<=10**XLF_plotting_data.x[-1]))
+mXLF_x=mXLF_data.x[good_ones]
+XLF_sim=XLF_plot_int(mXLF_x)
+S=np.sum((np.log10(XLF_sim)-np.log10(mXLF_data.y[good_ones]))**2)
+print(f'lambda{lambda_z:.2f}_alpha{alpha_z:.2f}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
+if methods['edd_ratio']=="Schechter":
+   append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, lambda={lambda_z:.2f}, alpha={alpha_z:.2f}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
+elif methods['edd_ratio']=="Gaussian":
+   append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, mean={alpha_z:.2f}, sigma={lambda_z:.2f}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
+
+
                                         
-gals['nh'] = agn.luminosity_to_nh(gals.luminosity, z)
-gals['agn_type'] = agn.nh_to_type(gals.nh)
+#gals['nh'] = agn.luminosity_to_nh(gals.luminosity, z)
+
+#gals['agn_type'] = agn.nh_to_type(gals.nh)
 
 gals['SFR'] = agn.SFR(z,gals.stellar_mass,methods['SFR'])
 gals['lx/SFR'] = (gals.luminosity-42)-gals.SFR
@@ -236,8 +188,10 @@ bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row['luminosity']/row['S
 #print(bs_perc)
 
 # save dataframe to file and add to dictionary for use
-bs_perc.to_csv(curr_dir+f'/Ros_plots/bs_perc_z{z}.csv')
-
+if methods['edd_ratio']=="Schechter":
+  bs_perc.to_csv(curr_dir+'/Ros_plots/'+sub_dir+f'bs_perc_z{z}_lambda{lambda_z:.2f}_alpha{alpha_z:.2f}.csv')
+elif methods['edd_ratio']=="Gaussian":
+  bs_perc.to_csv(curr_dir+'/Ros_plots/'+sub_dir+f'bs_perc_z{z}_mean{alpha_z:.2f}_sigma{lambda_z:.2f}.csv')
 
 ################################
 ## Plot ##
