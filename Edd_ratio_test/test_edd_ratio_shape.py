@@ -38,7 +38,7 @@ plt.axvline(schechter_max);
 #plt.yscale('log');
 #%%
 # shankar + gaussian
-arg1= 0.05
+arg1= 2
 arg2= 0.25
 
 plt.plot(edd,gaussian(edd,arg1,arg2));
@@ -48,6 +48,14 @@ arg1= 0.2
 arg2= 0.6
 
 plt.plot(edd,gaussian(edd,arg1,arg2));
+#%%
+# shankar + LOG gaussian
+# Edd ratio values range
+edd_bin = np.arange(-4, 0, 0.001)
+arg1= 0.3 # sigma log2
+arg2= -0.6 # mean log0.25
+
+plt.plot(10**edd_bin,gaussian(edd_bin,arg1,arg2));
 
 # %%
 # plots k corrs
