@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import dc_stat_think as dcst
+import weightedstats as ws 
 from scipy import interpolate
 import matplotlib.lines as mlines
 
@@ -51,10 +52,13 @@ volume = 200**3 # Mpc?
 # import simulation parameters
 sub_dir='Sahu_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3 
 #sub_dir='R&V_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3 
-sub_dir= 'R&V_Schechter/' # z=1: pars1. 
+sub_dir= 'R&V_Schechter/' 
+sub_dir= 'Sahu_Schechter/' 
+sub_dir= 'Davis_Schechter/'
+sub_dir= 'Standard_Gaussian/' 
 sys.path.append(curr_dir+'/Ros_plots/'+sub_dir)
 
-from pars7 import *
+from pars1 import *
 
 if methods['edd_ratio']=='Gaussian':
    lambda_z=sigma_z
@@ -85,7 +89,9 @@ gals['black_hole_mass'] = agn.stellar_mass_to_black_hole_mass(gals.stellar_mass,
 
 # Duty cycles
 gals['duty_cycle'] = agn.to_duty_cycle(methods['duty_cycle'], gals.stellar_mass, gals.black_hole_mass, z, suppress_output=True)
-
+print('duty cycle:')
+print(gals['duty_cycle'])
+print(gals.describe())
 
 ###############
 # plot XLF
@@ -127,11 +133,11 @@ for par in parameters:
    mXLF_x=mXLF_data.x[good_ones]
    XLF_sim=XLF_plot_int(mXLF_x)
    S=np.sum((np.log10(XLF_sim)-np.log10(mXLF_data.y[good_ones]))**2)
-   print(f'lambda{lambda_z}_alpha{alpha_z}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
+   print(f'lambda{lambda_z:.2f}_alpha{alpha_z:.2f}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
    if methods['edd_ratio']=="Schechter":
-      append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, lambda={lambda_z}, alpha={alpha_z}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
+      append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, lambda={lambda_z:.2f}, alpha={alpha_z:.2f}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
    elif methods['edd_ratio']=="Gaussian":
-      append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, mean={alpha_z}, sigma={lambda_z}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
+      append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, mean={alpha_z:.2f}, sigma={lambda_z:.2f}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
 
    #gals_tmp['nh'] = agn.luminosity_to_nh(gals_tmp.luminosity, z)
    #gals_tmp['agn_type'] = agn.nh_to_type(gals_tmp.nh)
@@ -141,16 +147,17 @@ for par in parameters:
 
    ################################
    # grouping in mass bins - log units
-   grouped_gals = gals_tmp[['stellar_mass','luminosity','SFR','lx/SFR']].groupby(pd.cut(gals_tmp.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+   grouped_gals = gals_tmp[['stellar_mass','luminosity','SFR','lx/SFR','duty_cycle']].groupby(pd.cut(gals_tmp.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
 
    # converting to linear units
    gals_lin=pd.DataFrame()
    gals_lin['stellar_mass'] = gals_tmp['stellar_mass']
+   gals_lin['duty_cycle'] = gals_tmp['duty_cycle']
    gals_lin['luminosity']= 10**(gals_tmp.luminosity-42)
    gals_lin[['SFR','lx/SFR']]=10**gals_tmp[['SFR','lx/SFR']]
 
    # grouping linear table
-   grouped_lin = gals_lin[['stellar_mass','luminosity','SFR','lx/SFR']].groupby(pd.cut(gals_tmp.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+   grouped_lin = gals_lin[['stellar_mass','luminosity','SFR','lx/SFR','duty_cycle']].groupby(pd.cut(gals_tmp.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
    # limit to logM>9
    ggals_lin=grouped_lin[grouped_lin['stellar_mass',0.5] > 9]
    grouped_lin.index.rename('mass_range',inplace=True)
@@ -158,17 +165,21 @@ for par in parameters:
    ################################
    ## Bootstrapping ##
    ################################
-   func=np.median
    M_min=np.max([9,M_inf])
 
    # create dataframe for bootstrapping
    gals_highM=gals_lin.copy()[gals_lin.stellar_mass > M_min]
-   grouped_linear = gals_highM[['stellar_mass','luminosity','SFR','lx/SFR']].groupby(pd.cut(gals_highM.stellar_mass, np.append(np.arange(M_min, 11.5, 0.5),12.)))#.quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+   grouped_linear = gals_highM[['stellar_mass','luminosity','SFR','lx/SFR','duty_cycle']].groupby(pd.cut(gals_highM.stellar_mass, np.append(np.arange(M_min, 11.5, 0.5),12.)))#.quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
 
    # create dataframe of bootstraped linear varibles
    gals_bs=pd.DataFrame()
+   
+   func=np.median
    gals_bs['SFR'] = grouped_linear.SFR.apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
-   gals_bs['luminosity'] = grouped_linear.luminosity.apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
+
+   func=ws.weighted_median
+   gals_bs['luminosity'] = grouped_linear.apply(lambda x: dcst.draw_bs_reps(x.luminosity, func, size=500,args=(x.duty_cycle,)))
+   #gals_bs['luminosity'] = grouped_linear.luminosity.apply(lambda x: dcst.draw_bs_reps(x, func, size=500)) #with median
    gals_bs.head()
 
    # create dataframe with percentiles of the bootstrapped distribution
@@ -372,16 +383,16 @@ def SFR_LX(df_dic,data,m_min=2,leg_title=None,file_path='./'):
 
 if methods['edd_ratio']=="Schechter":
    if par_str == 'lambda':
-      title_str=r'$\alpha$={}, z={}'.format(methods['duty_cycle'],alpha_z,z)
+      title_str=r'$\alpha$={}, z={}'.format(alpha_z,z)
       file_name=curr_dir+'/Ros_plots/'+sub_dir+f'SFvsLX_z{z}_alpha{alpha_z}'+par_str+'.pdf'
    elif par_str == 'alpha':
-      title_str=r'$\lambda$={}, z={}'.format(methods['duty_cycle'],lambda_z,z)
+      title_str=r'$\lambda$={}, z={}'.format(lambda_z,z)
       file_name=curr_dir+'/Ros_plots/'+sub_dir+f'SFvsLX_z{z}_lambda{lambda_z}'+par_str+'.pdf'
 elif methods['edd_ratio']=="Gaussian":
    if par_str == 'sigma':
-      title_str=r'$\mu$={}, z={}'.format(methods['duty_cycle'],mu_z,z)
+      title_str=r'$\mu$={}, z={}'.format(mu_z,z)
       file_name=curr_dir+'/Ros_plots/'+sub_dir+f'SFvsLX_z{z}_mean{mu_z}'+par_str+'.pdf'
    elif par_str == 'mean':
-      title_str=r'$\sigma$={}, z={}'.format(methods['duty_cycle'],sigma_z,z)
+      title_str=r'$\sigma$={}, z={}'.format(sigma_z,z)
       file_name=curr_dir+'/Ros_plots/'+sub_dir+f'SFvsLX_z{z}_sigma{sigma_z}'+par_str+'.pdf'
 SFR_LX(df_dic,data,m_min=4,leg_title=title_str,file_path=file_name)
