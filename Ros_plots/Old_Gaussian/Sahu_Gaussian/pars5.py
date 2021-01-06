@@ -1,4 +1,4 @@
-# set pars for sahu, gaussian varying sigma with mean=0.05
+# set pars for z=0.45, sahu, gaussian varying sigma with mean=0.05
 
 import numpy as np
 

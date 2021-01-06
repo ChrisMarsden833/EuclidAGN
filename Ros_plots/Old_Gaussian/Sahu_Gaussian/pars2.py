@@ -1,10 +1,10 @@
-# set pars for sahu, gaussian varying sigma with mean=0.25
+# set pars for z=1, sahu, gaussian varying sigma with mean=0.05
 
 import numpy as np
 
 ################################
 # set simulation parameters
-z = 0.45
+z = 1.
 reds_dic={0.45:0, 1:1, 1.7:2, 2.7:3}
 index=reds_dic.get(z) # needed for IDL data
 
@@ -80,7 +80,7 @@ if z==1 and methods['edd_ratio']=='Schechter' and methods['duty_cycle']==0.18 an
 
 if methods['edd_ratio']=='Gaussian':
     sigma_z = 0.05 # sigma
-    mu_z = 0.25 # mean edd
+    mu_z = 0.05 # mean edd
 
 #if methods['BH_mass_method']=="Davis18":
 #    slope=1.
