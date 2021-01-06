@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import dc_stat_think as dcst
+import weightedstats as ws 
 from scipy import interpolate
 
 curr_dir=os.getcwd()
@@ -34,7 +35,7 @@ data={}
 for key, val in read_data.items():
     data[key]=np.copy(val)
     data[key][data[key] == 0.] = np.nan
-print(data.keys())
+#print(data.keys())
 
 ################################
 # my cosmology
@@ -45,13 +46,20 @@ cosmo = 'Carraro+20'
 cosmology = cosmology.setCosmology(cosmo)
 volume = 200**3 # Mpc?
 
+### Define parameters for code to work
+slope=None
+
 ################################
 # import simulation parameters
 sub_dir='Sahu_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3 
 #sub_dir='R&V_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3 
 sub_dir= 'R&V_Schechter/' # z=1: pars1. 
 sub_dir= 'Standard/'
+sub_dir= 'Scaling_rels_bestLF/'
+sub_dir= 'Duty_cycles/'
+sub_dir= 'Davis_slope/'
 sub_dir= 'Scaling_rels/'
+sub_dir= 'Scaling_rels_restr/'
 sys.path.append(curr_dir+'/Ros_plots/'+sub_dir)
 
 from pars1 import *
@@ -79,8 +87,12 @@ if M_sup > 0:
 print(gals.stellar_mass.min(),gals.stellar_mass.max())
 
 # BH
-gals['black_hole_mass'] = agn.stellar_mass_to_black_hole_mass(gals.stellar_mass, method = methods['BH_mass_method'], 
-                                                                                scatter = methods['BH_mass_scatter'],)#slope=slope,norm=norm
+if slope is not None:
+   gals['black_hole_mass'] = agn.stellar_mass_to_black_hole_mass(gals.stellar_mass, method = methods['BH_mass_method'], 
+                                                                  scatter = methods['BH_mass_scatter'],slope=slope)
+else:
+   gals['black_hole_mass'] = agn.stellar_mass_to_black_hole_mass(gals.stellar_mass, method = methods['BH_mass_method'], 
+                                                                  scatter = methods['BH_mass_scatter'])
 
 # Duty cycles
 gals['duty_cycle'] = agn.to_duty_cycle(methods['duty_cycle'], gals.stellar_mass, gals.black_hole_mass, z)
@@ -142,16 +154,17 @@ gals['lx/SFR'] = (gals.luminosity-42)-gals.SFR
 
 ################################
 # grouping in mass bins - log units
-grouped_gals = gals[['stellar_mass','luminosity','SFR','lx/SFR']].groupby(pd.cut(gals.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+grouped_gals = gals[['stellar_mass','luminosity','SFR','lx/SFR','duty_cycle']].groupby(pd.cut(gals.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
 
 # converting to linear units
 gals_lin=pd.DataFrame()
 gals_lin['stellar_mass'] = gals['stellar_mass']
+gals_lin['duty_cycle'] = gals['duty_cycle']
 gals_lin['luminosity']= 10**(gals.luminosity-42)
 gals_lin[['SFR','lx/SFR']]=10**gals[['SFR','lx/SFR']]
 
 # grouping linear table
-grouped_lin = gals_lin[['stellar_mass','luminosity','SFR','lx/SFR']].groupby(pd.cut(gals.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+grouped_lin = gals_lin[['stellar_mass','luminosity','SFR','lx/SFR','duty_cycle']].groupby(pd.cut(gals.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
 # limit to logM>9
 ggals_lin=grouped_lin[grouped_lin['stellar_mass',0.5] > 9]
 grouped_lin.index.rename('mass_range',inplace=True)
@@ -159,17 +172,22 @@ grouped_lin.index.rename('mass_range',inplace=True)
 ################################
 ## Bootstrapping ##
 ################################
-func=np.median
 M_min=np.max([9,M_inf])
 
 # create dataframe for bootstrapping
 gals_highM=gals_lin.copy()[gals_lin.stellar_mass > M_min]
-grouped_linear = gals_highM[['stellar_mass','luminosity','SFR','lx/SFR']].groupby(pd.cut(gals_highM.stellar_mass, np.append(np.arange(M_min, 11.5, 0.5),12.)))#.quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+grouped_linear = gals_highM[['stellar_mass','luminosity','SFR','lx/SFR','duty_cycle']].groupby(pd.cut(gals_highM.stellar_mass, np.append(np.arange(M_min, 11.5, 0.5),12.)))#.quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
 
 # create dataframe of bootstraped linear varibles
 gals_bs=pd.DataFrame()
+func=np.median
 gals_bs['SFR'] = grouped_linear.SFR.apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
-gals_bs['luminosity'] = grouped_linear.luminosity.apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
+
+func=ws.weighted_median
+def weighted_bootsrap(x,y):
+   return dcst.draw_bs_reps(x, func, size=500,args=(y,))
+gals_bs['luminosity'] = grouped_linear.apply(lambda x: weighted_bootsrap(x.luminosity,x.duty_cycle))
+#gals_bs['luminosity'] = grouped_linear.luminosity.apply(lambda x: dcst.draw_bs_reps(x, func, size=500)) #with median
 gals_bs.head()
 
 # create dataframe with percentiles of the bootstrapped distribution
@@ -289,7 +307,7 @@ def comp_plot(df_dic,method_legend,filename='Comparisons',leg_title=None):
     ax.set_xlabel('M$_*$ (M$_\odot$)')
     ax.set_ylabel('L$_X$ (2-10 keV) / $10^{42}$ (erg/s)')
     ax.legend(loc='lower right',title=leg_title)
-    plt.savefig(curr_dir+'/Ros_plots/'+filename+f'_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) ;
+    plt.savefig(curr_dir+'/Ros_plots/'+sub_dir+filename+f'_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) ;
     return
 
 ################################
@@ -327,4 +345,4 @@ plt.yscale('log')
 plt.xlabel('SFR (M$_\odot$/yr)')
 plt.ylabel('L$_X$ (2-10 keV) / $10^{42}$ (erg/s)')
 plt.legend(loc='upper left');
-plt.savefig(curr_dir+f'/Ros_plots/SFvsLX_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
+plt.savefig(curr_dir+'/Ros_plots/'+sub_dir+f'SFvsLX_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
