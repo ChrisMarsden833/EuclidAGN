@@ -31,7 +31,7 @@ def append_new_line(file_name, text_to_append):
 ################################
 # import data from IDL
 from scipy.io import readsav
-read_data = readsav('vars_EuclidAGN_90.sav',verbose=True)
+read_data = readsav('./IDL_data/vars_EuclidAGN_90.sav',verbose=True)
 
 data={}
 for key, val in read_data.items():
@@ -88,11 +88,9 @@ gals['black_hole_mass'] = agn.stellar_mass_to_black_hole_mass(gals.stellar_mass,
                                                                                 scatter = methods['BH_mass_scatter'],)#slope=slope,norm=norm
 
 # Duty cycles
-gals['duty_cycle'] = agn.to_duty_cycle(methods['duty_cycle'], gals.stellar_mass, gals.black_hole_mass, z, suppress_output=True)
-print('duty cycle:')
-print(gals['duty_cycle'])
-print(gals.describe())
+gals['duty_cycle'] = agn.to_duty_cycle(methods['duty_cycle'], gals.stellar_mass, gals.black_hole_mass, z)
 
+"""
 ###############
 # plot XLF
 plt.figure()
@@ -103,6 +101,7 @@ mXLF_data = XLF.get_miyaji2015()
 plt.plot(mXLF_data.x, mXLF_data.y, 'o', label = "Miyaji")
 uXLF_data = XLF.get_ueda14(np.arange(42, 46, 0.1))
 plt.plot(uXLF_data.x, uXLF_data.y, ':', label = "Ueda")
+"""
 
 for par in parameters:
    if (par_str == 'lambda') or (par_str == 'sigma'):
@@ -114,12 +113,12 @@ for par in parameters:
    gals_tmp= gals.copy()
 
    #gals_tmp['luminosity'] = agn.black_hole_mass_to_luminosity(gals_tmp.black_hole_mass, 
-   gals_tmp['luminosity'], XLF_plotting_data, _, lambda_car = agn.black_hole_mass_to_luminosity(
+   gals_tmp['luminosity'], lambda_char, _ = agn.black_hole_mass_to_luminosity(
                                           gals_tmp.black_hole_mass, 
-                                          gals_tmp.duty_cycle, gals_tmp.stellar_mass, z, methods['edd_ratio'], return_plotting_data=True,
+                                          z, methods['edd_ratio'],
                                           bol_corr=methods['bol_corr'], parameter1=lambda_z, parameter2=alpha_z)
                                           #bol_corr=methods['bol_corr'], parameter1=sigma_z, parameter2=mu_z)
-   
+   """
    # plot XLF
    #try:
    plt.plot(10**XLF_plotting_data.x, 10**XLF_plotting_data.y, label = r"{} = {}".format(variable_name, par))
@@ -133,11 +132,13 @@ for par in parameters:
    mXLF_x=mXLF_data.x[good_ones]
    XLF_sim=XLF_plot_int(mXLF_x)
    S=np.sum((np.log10(XLF_sim)-np.log10(mXLF_data.y[good_ones]))**2)
-   print(f'lambda{lambda_z:.2f}_alpha{alpha_z:.2f}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
+   """
+   #Save to file the characteristic lambda
+   print(f'lambda{lambda_z:.2f}_alpha{alpha_z:.2f}:\tlambda_char={lambda_char:.2f}')#, Squares sum={S:.2e}
    if methods['edd_ratio']=="Schechter":
-      append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, lambda={lambda_z:.2f}, alpha={alpha_z:.2f}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
+      append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, lambda={lambda_z:.2f}, alpha={alpha_z:.2f}:\tlambda_char={lambda_char:.2f}')#, Squares sum={S:.2e}
    elif methods['edd_ratio']=="Gaussian":
-      append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, mean={alpha_z:.2f}, sigma={lambda_z:.2f}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
+      append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, mean={alpha_z:.2f}, sigma={lambda_z:.2f}:\tlambda_char={lambda_char:.2f}')#, Squares sum={S:.2e}
 
    #gals_tmp['nh'] = agn.luminosity_to_nh(gals_tmp.luminosity, z)
    #gals_tmp['agn_type'] = agn.nh_to_type(gals_tmp.nh)
@@ -147,7 +148,7 @@ for par in parameters:
 
    ################################
    # grouping in mass bins - log units
-   grouped_gals = gals_tmp[['stellar_mass','luminosity','SFR','lx/SFR','duty_cycle']].groupby(pd.cut(gals_tmp.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+   #grouped_gals = gals_tmp[['stellar_mass','luminosity','SFR','lx/SFR','duty_cycle']].groupby(pd.cut(gals_tmp.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
 
    # converting to linear units
    gals_lin=pd.DataFrame()
@@ -179,6 +180,7 @@ for par in parameters:
 
    func=ws.weighted_median
    gals_bs['luminosity'] = grouped_linear.apply(lambda x: dcst.draw_bs_reps(x.luminosity, func, size=500,args=(x.duty_cycle,)))
+   # draw_bs_reps applies ws.weighted_median(bs_sample, weights=duty_cycle)
    #gals_bs['luminosity'] = grouped_linear.luminosity.apply(lambda x: dcst.draw_bs_reps(x, func, size=500)) #with median
    gals_bs.head()
 
@@ -205,7 +207,7 @@ for par in parameters:
       bs_perc.to_csv(curr_dir+'/Ros_plots/'+sub_dir+f'bs_perc_z{z}_mean{alpha_z}_sigma{lambda_z}.csv')
    df_dic[par_str+f'{par}']=bs_perc
 
-
+"""
 # finish plot
 plt.xlabel(r'$L_x\;[erg\;s^{-1}]$')
 plt.ylabel(r'$d\phi /d(log\;L_x)\;[Mpc^{-3}]$')
@@ -227,6 +229,7 @@ elif methods['edd_ratio']=="Gaussian":
       file_name=curr_dir+'/Ros_plots/'+sub_dir+f'XLF_z{z}_sigma{sigma_z}'+par_str+'.pdf'
 plt.title(title_str)
 plt.savefig(file_name, format = 'pdf', bbox_inches = 'tight',transparent=True)
+"""
 
 ################################
 ## Plot ##

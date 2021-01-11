@@ -29,7 +29,7 @@ def append_new_line(file_name, text_to_append):
 ################################
 # import data from IDL
 from scipy.io import readsav
-read_data = readsav('vars_EuclidAGN_90.sav',verbose=True)
+read_data = readsav('./IDL_data/vars_EuclidAGN_90.sav',verbose=True)
 
 data={}
 for key, val in read_data.items():
@@ -54,12 +54,12 @@ slope=None
 sub_dir='Sahu_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3 
 #sub_dir='R&V_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3 
 sub_dir= 'R&V_Schechter/' # z=1: pars1. 
-sub_dir= 'Standard/'
 sub_dir= 'Scaling_rels_bestLF/'
-sub_dir= 'Duty_cycles/'
 sub_dir= 'Davis_slope/'
 sub_dir= 'Scaling_rels/'
 sub_dir= 'Scaling_rels_restr/'
+sub_dir= 'Duty_cycles/'
+sub_dir= 'Standard/'
 sys.path.append(curr_dir+'/Ros_plots/'+sub_dir)
 
 from pars1 import *
@@ -97,14 +97,12 @@ else:
 # Duty cycles
 gals['duty_cycle'] = agn.to_duty_cycle(methods['duty_cycle'], gals.stellar_mass, gals.black_hole_mass, z)
 
-#gals['luminosity'] = agn.black_hole_mass_to_luminosity(gals.black_hole_mass, gals.duty_cycle, gals.stellar_mass, z, methods['edd_ratio'],
-#                                        bol_corr=methods['bol_corr'], parameter1=lambda_z, parameter2=alpha_z)
-gals['luminosity'], XLF_plotting_data, _, lambda_car = agn.black_hole_mass_to_luminosity(
+gals['luminosity'], lambda_char, _ = agn.black_hole_mass_to_luminosity(
                                           gals.black_hole_mass, 
-                                          gals.duty_cycle, gals.stellar_mass, z, methods['edd_ratio'], return_plotting_data=True,
+                                          z, methods['edd_ratio'],
                                           bol_corr=methods['bol_corr'], parameter1=lambda_z, parameter2=alpha_z)
                                           #bol_corr=methods['bol_corr'], parameter1=sigma_z, parameter2=mu_z)
-
+"""
 ###############
 # plot XLF
 plt.figure()
@@ -137,16 +135,15 @@ good_ones=np.logical_and((mXLF_data.x>=10**XLF_plotting_data.x[0]), (mXLF_data.x
 mXLF_x=mXLF_data.x[good_ones]
 XLF_sim=XLF_plot_int(mXLF_x)
 S=np.sum((np.log10(XLF_sim)-np.log10(mXLF_data.y[good_ones]))**2)
-print(f'lambda{lambda_z:.2f}_alpha{alpha_z:.2f}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
+"""
+#Save to file the characteristic lambda
+print(f'lambda{lambda_z:.2f}_alpha{alpha_z:.2f}:\tlambda_char={lambda_char:.2f}')#, Squares sum={S:.2e}
 if methods['edd_ratio']=="Schechter":
-   append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, lambda={lambda_z:.2f}, alpha={alpha_z:.2f}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
+   append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, lambda={lambda_z:.2f}, alpha={alpha_z:.2f}:\tlambda_char={lambda_char:.2f}')#, Squares sum={S:.2e}
 elif methods['edd_ratio']=="Gaussian":
-   append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, mean={alpha_z:.2f}, sigma={lambda_z:.2f}:\tlambda_car={lambda_car:.2f}, Squares sum={S:.2e}')
+   append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, mean={alpha_z:.2f}, sigma={lambda_z:.2f}:\tlambda_char={lambda_char:.2f}')#, Squares sum={S:.2e}
 
-
-                                        
 #gals['nh'] = agn.luminosity_to_nh(gals.luminosity, z)
-
 #gals['agn_type'] = agn.nh_to_type(gals.nh)
 
 gals['SFR'] = agn.SFR(z,gals.stellar_mass,methods['SFR'])
@@ -154,7 +151,7 @@ gals['lx/SFR'] = (gals.luminosity-42)-gals.SFR
 
 ################################
 # grouping in mass bins - log units
-grouped_gals = gals[['stellar_mass','luminosity','SFR','lx/SFR','duty_cycle']].groupby(pd.cut(gals.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+#grouped_gals = gals[['stellar_mass','luminosity','SFR','lx/SFR','duty_cycle']].groupby(pd.cut(gals.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
 
 # converting to linear units
 gals_lin=pd.DataFrame()
@@ -185,6 +182,7 @@ gals_bs['SFR'] = grouped_linear.SFR.apply(lambda x: dcst.draw_bs_reps(x, func, s
 
 func=ws.weighted_median
 def weighted_bootsrap(x,y):
+   # draw_bs_reps applies ws.weighted_median(x_bs_i, weights=y)
    return dcst.draw_bs_reps(x, func, size=500,args=(y,))
 gals_bs['luminosity'] = grouped_linear.apply(lambda x: weighted_bootsrap(x.luminosity,x.duty_cycle))
 #gals_bs['luminosity'] = grouped_linear.luminosity.apply(lambda x: dcst.draw_bs_reps(x, func, size=500)) #with median
