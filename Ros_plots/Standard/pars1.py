@@ -1,4 +1,4 @@
-# set pars for z=1, sahu, log gaussian varying mean with sigma=0.3dex
+# set pars for z=1, Shankar, Schechter lambda=-0.8, alpha=1.6
 
 import numpy as np
 
