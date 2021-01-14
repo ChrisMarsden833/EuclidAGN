@@ -149,6 +149,9 @@ elif methods['edd_ratio']=="Gaussian":
 gals['SFR'] = agn.SFR(z,gals.stellar_mass,methods['SFR'])
 gals['lx/SFR'] = (gals.luminosity-42)-gals.SFR
 
+gals['SFR_Q'] = agn.SFR_Q(z,gals.stellar_mass)
+gals['SFR_SB'] = agn.SFR_SB(z,gals.stellar_mass)
+
 ################################
 # grouping in mass bins - log units
 #grouped_gals = gals[['stellar_mass','luminosity','SFR','lx/SFR','duty_cycle']].groupby(pd.cut(gals.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
@@ -159,9 +162,11 @@ gals_lin['stellar_mass'] = gals['stellar_mass']
 gals_lin['duty_cycle'] = gals['duty_cycle']
 gals_lin['luminosity']= 10**(gals.luminosity-42)
 gals_lin[['SFR','lx/SFR']]=10**gals[['SFR','lx/SFR']]
+gals_lin['SFR_Q'] = 10**(gals.SFR_Q)
+gals_lin['SFR_SB'] = 10**(gals.SFR_SB)
 
 # grouping linear table
-grouped_lin = gals_lin[['stellar_mass','luminosity','SFR','lx/SFR','duty_cycle']].groupby(pd.cut(gals.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+grouped_lin = gals_lin[['stellar_mass','luminosity','SFR','SFR_Q','SFR_SB','lx/SFR','duty_cycle']].groupby(pd.cut(gals.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
 # limit to logM>9
 ggals_lin=grouped_lin[grouped_lin['stellar_mass',0.5] > 9]
 grouped_lin.index.rename('mass_range',inplace=True)
@@ -173,12 +178,14 @@ M_min=np.max([9,M_inf])
 
 # create dataframe for bootstrapping
 gals_highM=gals_lin.copy()[gals_lin.stellar_mass > M_min]
-grouped_linear = gals_highM[['stellar_mass','luminosity','SFR','lx/SFR','duty_cycle']].groupby(pd.cut(gals_highM.stellar_mass, np.append(np.arange(M_min, 11.5, 0.5),12.)))#.quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+grouped_linear = gals_highM[['stellar_mass','luminosity','SFR','SFR_Q','SFR_SB','lx/SFR','duty_cycle']].groupby(pd.cut(gals_highM.stellar_mass, np.append(np.arange(M_min, 11.5, 0.5),12.)))#.quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
 
 # create dataframe of bootstraped linear varibles
 gals_bs=pd.DataFrame()
 func=np.median
 gals_bs['SFR'] = grouped_linear.SFR.apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
+gals_bs['SFR_Q'] = grouped_linear.SFR_Q.apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
+gals_bs['SFR_SB'] = grouped_linear.SFR_SB.apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
 
 func=ws.weighted_median
 def weighted_bootsrap(x,y):
@@ -197,6 +204,10 @@ bs_perc.columns = pd.MultiIndex.from_frame(old_idx)
 
 bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs['SFR']]), 
                                   index=bs_perc.index, columns=pd.MultiIndex.from_product([['SFR'],perc_colnames])))
+bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs['SFR_Q']]), 
+                                  index=bs_perc.index, columns=pd.MultiIndex.from_product([['SFR_Q'],perc_colnames])))
+bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs['SFR_SB']]), 
+                                  index=bs_perc.index, columns=pd.MultiIndex.from_product([['SFR_SB'],perc_colnames])))
 bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs['luminosity']]), 
                                   index=bs_perc.index, columns=pd.MultiIndex.from_product([['luminosity'],perc_colnames])))
 bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row['luminosity']/row['SFR'],[0.05,0.1585,0.5,0.8415,0.95]) for i,row in gals_bs.iterrows()]), 

@@ -880,6 +880,7 @@ def calculate_hod(up_id, halo_mass, duty_cycle_weight, centrals=True):
     return utl.PlottingData(bins[0:-1], hod)
 
 def SFR(z,Mstar, method='Tomczak16'):
+    # returns SFR in log scale
     sig = 0.2 # intrinsic scatter in the relation in dex
 
     if method == 'Tomczak16':
@@ -903,6 +904,16 @@ def SFR(z,Mstar, method='Tomczak16'):
 
     else:
         assert False, "Method is unknown"
+
+def SFR_Q(z,Mstar):
+   # returns SFR in log scale
+   sig = 0.2 # intrinsic scatter in the relation in dex
+   return np.log10(0.37 *Mstar-3.6)+np.random.normal(0.,sig,len(Mstar))
+
+def SFR_SB(z,Mstar):
+   # returns SFR in log scale
+   sig = 0.2 # intrinsic scatter in the relation in dex
+   return np.log10(0.61 *Mstar-4.3)+np.random.normal(0.,sig,len(Mstar))
 
 def schreiber(m,r,a0,a1,a2,m0,m1):
     return m - m0 + a0*r - a1*(np.maximum(0.,m-m1-a2*r))**2
