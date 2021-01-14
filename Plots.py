@@ -13,14 +13,29 @@ from scipy.io import readsav
 curr_dir=os.getcwd()
 #%%
 # import data from IDL
-
-read_data = readsav('vars_EuclidAGN_90.sav',verbose=True)
+# SF
+read_data = readsav('./IDL_data/vars_EuclidAGN_90.sav',verbose=True)
 
 data={}
 for key, val in read_data.items():
     data[key]=np.copy(val)
     data[key][data[key] == 0.] = np.nan
 #print(data.keys())
+
+# Q
+read_data = readsav('./IDL_data/vars_EuclidAGN_90_Q.sav')
+data_Q={}
+for key, val in read_data.items():
+    data_Q[key]=np.copy(val)
+    data_Q[key][data_Q[key] == 0.] = np.nan
+
+# SB
+read_data = readsav('./IDL_data/vars_EuclidAGN_90_SB.sav',verbose=True)
+
+data_SB={}
+for key, val in read_data.items():
+    data_SB[key]=np.copy(val)
+    data_SB[key][data_SB[key] == 0.] = np.nan
 #%%
 # Universe parameters
 z = 1.
@@ -123,14 +138,34 @@ def read_dfs(paths,keys=None):
 
 #%%
 # function for comparison subplots
-def comp_subplot(ax,df_dic,method_legend=None,leg_title=None,m_min=2,i=0):
+def comp_subplot(ax,df_dic,method_legend=None,leg_title=None,m_min=2,i=0,Q=False,SB=False):
 
     # "real" datapoints
-    ax.scatter(data['m_ave'][0,m_min:,i], data['l_ave'][0,m_min:,i], edgecolors='Black', marker="s",label='Carraro et al. (2020)')
+    if Q or SB:
+       label='SF Carraro et al. (2020)'
+    else:
+       label='Carraro et al. (2020)'
+    ax.scatter(data['m_ave'][0,m_min:,i], data['l_ave'][0,m_min:,i], edgecolors='Black', marker="s",label=label)
     ax.errorbar(data['m_ave'][0,m_min:,i], data['l_ave'][0,m_min:,i],
                     yerr=np.array([data['l_ave'][0,m_min:,i] - data['l_ave'][2,m_min:,i], 
                         data['l_ave'][1,m_min:,i] - data['l_ave'][0,m_min:,i]]),
                     linestyle='solid', zorder=0)
+
+    # "real" datapoints
+    if Q==True:
+      ax.scatter(data_Q['m_ave'][0,m_min:,i], data_Q['l_ave'][0,m_min:,i], edgecolors='Black', marker="X",color=cols[0],label='Q Carraro et al. (2020)')
+      ax.errorbar(data_Q['m_ave'][0,m_min:,i], data_Q['l_ave'][0,m_min:,i],
+                     yerr=np.array([data_Q['l_ave'][0,m_min:,i] - data_Q['l_ave'][2,m_min:,i], 
+                           data_Q['l_ave'][1,m_min:,i] - data_Q['l_ave'][0,m_min:,i]]),
+                     linestyle='solid',color=cols[0], zorder=0)
+
+    # "real" datapoints
+    if SB==True:
+      ax.scatter(data_SB['m_ave'][0,:,i], data_SB['l_ave'][0,:,i], edgecolors='Black', marker="d",color=cols[0],label='SB Carraro et al. (2020)')
+      ax.errorbar(data_SB['m_ave'][0,:,i], data_SB['l_ave'][0,:,i],
+                     yerr=np.array([data_SB['l_ave'][0,:,i] - data_SB['l_ave'][2,:,i], 
+                           data_SB['l_ave'][1,:,i] - data_SB['l_ave'][0,:,i]]),
+                     linestyle='solid',color=cols[0], zorder=0)
 
     # simulated datasets
     for j,(s,df) in enumerate(df_dic.items()):
@@ -152,13 +187,15 @@ def comp_subplot(ax,df_dic,method_legend=None,leg_title=None,m_min=2,i=0):
 
 #%%
 # make 1 single comparison plot
-def comp_plot(df_dic,method_legend=None,filename='Comparisons',leg_title=None,i=0):
+def comp_plot(df_dic,method_legend=None,filename='Comparisons',leg_title=None,i=0,Q=False,SB=False,m_min=2):
     fig,ax = plt.subplots(figsize=[9, 6])
     #plt.rcParams["axes.prop_cycle"] = get_cycle("tab10")
 
-    comp_subplot(ax,df_dic,method_legend,leg_title,i=i)
+    comp_subplot(ax,df_dic,method_legend,leg_title,i=i,Q=Q,SB=SB,m_min=m_min)
     
     ax.set_yscale('log')
+    #ax.set_ylim(3e-3,30)
+    #ax.set_xlim(9.3,11.25)
     ax.set_xlabel('<M$_*$> (M$_\odot$)')
     ax.set_ylabel('<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)')
     plt.savefig(curr_dir+'/Ros_plots/'+filename+f'_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) ;
@@ -235,6 +272,7 @@ leg_title='Scaling relation'
 SFR_LX(df_dic,data,leg_title)
 """
 #%%
+"""
 ###############################
 ######### Fig 1 ###############
 ###############################
@@ -450,25 +488,82 @@ plt.savefig(curr_dir+f'/Ros_plots/fig3.pdf', format = 'pdf', bbox_inches = 'tigh
 z = 1.
 i=reds_dic.get(z)
 methods['BH_mass_method']="Shankar et al. (2016)"
-
+"""
 #%%
 #####################################################
 ############ Test lambda char ############
 #####################################################
-# right
 z = 1.0
 i=reds_dic.get(z)
 # # Gaussian width Edd ratio distributions comparison
-paths = [curr_dir+f'/Ros_plots/R&V_Schechter/bs_perc_z{z}_lambda1.0_alpha0.0.csv', curr_dir+f'/Ros_plots/R&V_Schechter/bs_perc_z{z}_lambda-1.0_alpha0.0.csv', curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-2.0_sigma0.3.csv', curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-2.5_sigma0.3.csv']
+paths = [curr_dir+f'/Ros_plots/02_First_draft_circulation/R&V_Schechter/bs_perc_z{z}_lambda1.0_alpha0.0.csv', 
+         curr_dir+f'/Ros_plots/02_First_draft_circulation/R&V_Schechter/bs_perc_z{z}_lambda-1.0_alpha0.0.csv', 
+         curr_dir+f'/Ros_plots/02_First_draft_circulation/R&V_Gaussian/bs_perc_z{z}_mean-2.0_sigma0.3.csv', 
+         curr_dir+f'/Ros_plots/02_First_draft_circulation/R&V_Gaussian/bs_perc_z{z}_mean-2.5_sigma0.3.csv']
 paths = sorted(paths)
-#print(paths)
+df_dic = read_dfs(paths)
+
+method_legend=f"BH_mass: Reines & Volonteri (2015)"
+leg_title='Eddington ratio distribution'
+
+comp_plot(df_dic,method_legend,filename='Comparison_lambdachar',leg_title=leg_title,i=i)
+
+#%%
+######################################################################
+############ Compare SF,Q,SB to Reines&Volonteri relation ############
+######################################################################
+# # Comparison between LX-M* relation of SF,Q,SB galaxies
+z = 1.0
+i=reds_dic.get(z)
+paths =glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_*_sigma0.3.csv') 
+paths = sorted(paths)
 #read DFs
 df_dic = read_dfs(paths)
 
 method_legend=f"BH_mass: Reines & Volonteri (2015)"
 leg_title='Eddington ratio distribution'
 
-comp_plot(df_dic,method_legend,filename='Comparison_lambdachar',leg_title=None,i=i)
+comp_plot(df_dic,method_legend,filename=f'Comparison_SFQSB_z{z}',leg_title=leg_title,i=i,Q=True,SB=True,m_min=3)
+
+#%%
+#####################################################
+############ Test scatter Mh-M* ############
+#####################################################
+# # Comparison between Mh-M* relation with different additional scatter as error
+z = 1.0
+i=reds_dic.get(z)
+paths = [curr_dir+f'/Ros_plots/02_First_draft_circulation/Standard/bs_perc_z{z}_lambda-0.80_alpha1.60.csv', 
+         curr_dir+f'/Ros_plots/Standard/bs_perc_z{z}_lambda-0.80_alpha1.60.csv', 
+         curr_dir+f'/Ros_plots/Standard/Scatter_Mh-M*_0.3/bs_perc_z{z}_lambda-0.80_alpha1.60.csv', 
+         curr_dir+f'/Ros_plots/Standard/Scatter_Mh-M*_0.6/bs_perc_z{z}_lambda-0.80_alpha1.60.csv']
+#read DFs
+keys=['No scatter','Scatter 0.15 dex','Scatter 0.30 dex','Scatter 0.60 dex']
+df_dic = read_dfs(paths,keys)
+
+method_legend=f"BH_mass: Shankar+16"
+leg_title='Scatter in MH-M* relation'
+
+comp_plot(df_dic,method_legend,filename='Comparison_Scatter_Mh-M*',leg_title=leg_title,i=i)
+
+#%%
+#####################################################
+############ Test scatter Mbh-M* ############
+#####################################################
+# # Comparison between standard configuration and Shankar relation with intrinsic scatter
+# or double or quadruple scatter
+z = 1.0
+i=reds_dic.get(z)
+paths = [curr_dir+f'/Ros_plots/Standard/bs_perc_z{z}_lambda-0.80_alpha1.60.csv', 
+         curr_dir+f'/Ros_plots/Standard/Scatter_Mbh-M*_2*/bs_perc_z{z}_lambda-0.80_alpha1.60.csv', 
+         curr_dir+f'/Ros_plots/Standard/Scatter_Mbh-M*_4*/bs_perc_z{z}_lambda-0.80_alpha1.60.csv']
+#read DFs
+keys=['Intrinsic','2*Intrinsic','4*Intrinsic']
+df_dic = read_dfs(paths,keys)
+
+method_legend=f"BH_mass: Shankar+16"
+leg_title='Scatter in Mbh-M* relation'
+
+comp_plot(df_dic,method_legend,filename='Comparison_Scatter_Mbh-M*',leg_title=leg_title,i=i)
 
 """
 #%%
