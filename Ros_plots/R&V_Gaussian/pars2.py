@@ -28,7 +28,7 @@ elif methods['edd_ratio']=="Gaussian":
    #par_str= 'sigma'
    variable_name = r"$\mu$"
    par_str= 'mean'
-parameters = [-3.0,-2.5,-2.0,-1.5,-1.0,-0.5]
+parameters = [-3.0,-2.5,-2.0,-1.5,-1.25,-1.0,-0.5]
 
 ################################
 # Edd ratio parameters definition:
