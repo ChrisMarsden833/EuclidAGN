@@ -47,7 +47,9 @@ cosmology = cosmology.setCosmology(cosmo)
 volume = 200**3 # Mpc?
 
 ### Define parameters for code to work
-slope=None
+slope=None # to be used with Davis18
+norm=None # to be used with R&V
+suffix=''
 
 ################################
 # import simulation parameters
@@ -55,14 +57,16 @@ sub_dir='Sahu_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3
 #sub_dir='R&V_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3 
 sub_dir= 'R&V_Schechter/' # z=1: pars1. 
 sub_dir= 'Scaling_rels_bestLF/'
-sub_dir= 'Davis_slope/'
-sub_dir= 'Scaling_rels/'
 sub_dir= 'Scaling_rels_restr/'
 sub_dir= 'Duty_cycles/'
 sub_dir= 'Standard/'
+sub_dir='Test_R&V_Gaussian_SFQSB/' # up to pars11
+sub_dir= 'Scaling_rels/'
+sub_dir= 'Duty_cycles/'
+sub_dir= 'Davis_slope/'
 sys.path.append(curr_dir+'/Ros_plots/'+sub_dir)
 
-from pars1 import *
+from pars5 import *
 
 if methods['edd_ratio']=='Gaussian':
    lambda_z=sigma_z
@@ -83,13 +87,21 @@ gals['stellar_mass'] = agn.halo_mass_to_stellar_mass(gals.halos, z, formula=meth
 if M_inf > 0:
     gals=gals[gals['stellar_mass'] >= M_inf]
 if M_sup > 0:
-    gals=gals[gals['stellar_mass'] <= M_sup]
+    M_sup=np.min([12,M_sup])
+else:
+    M_sup=12
+gals=gals[gals['stellar_mass'] <= M_sup]
 print(gals.stellar_mass.min(),gals.stellar_mass.max())
 
 # BH
 if slope is not None:
+   if methods['BH_mass_method'] != 'Davis18': print('Warning! slope parameter is meant to be used with Davis+18 relation only')
    gals['black_hole_mass'] = agn.stellar_mass_to_black_hole_mass(gals.stellar_mass, method = methods['BH_mass_method'], 
                                                                   scatter = methods['BH_mass_scatter'],slope=slope)
+elif norm is not None:
+   if methods['BH_mass_method'] != 'Reines&Volonteri15': print('Warning! slope parameter is meant to be used with Reines&Volonteri15 relation only')
+   gals['black_hole_mass'] = agn.stellar_mass_to_black_hole_mass(gals.stellar_mass, method = methods['BH_mass_method'], 
+                                                                  scatter = methods['BH_mass_scatter'],norm=norm)
 else:
    gals['black_hole_mass'] = agn.stellar_mass_to_black_hole_mass(gals.stellar_mass, method = methods['BH_mass_method'], 
                                                                   scatter = methods['BH_mass_scatter'])
@@ -166,7 +178,7 @@ gals_lin['SFR_Q'] = 10**(gals.SFR_Q)
 gals_lin['SFR_SB'] = 10**(gals.SFR_SB)
 
 # grouping linear table
-grouped_lin = gals_lin[['stellar_mass','luminosity','SFR','SFR_Q','SFR_SB','lx/SFR','duty_cycle']].groupby(pd.cut(gals.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+grouped_lin = gals_lin[['stellar_mass','luminosity','SFR','SFR_Q','SFR_SB','lx/SFR','duty_cycle']].groupby(pd.cut(gals.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.5))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
 # limit to logM>9
 ggals_lin=grouped_lin[grouped_lin['stellar_mass',0.5] > 9]
 grouped_lin.index.rename('mass_range',inplace=True)
@@ -178,7 +190,7 @@ M_min=np.max([9,M_inf])
 
 # create dataframe for bootstrapping
 gals_highM=gals_lin.copy()[gals_lin.stellar_mass > M_min]
-grouped_linear = gals_highM[['stellar_mass','luminosity','SFR','SFR_Q','SFR_SB','lx/SFR','duty_cycle']].groupby(pd.cut(gals_highM.stellar_mass, np.append(np.arange(M_min, 11.5, 0.5),12.)))#.quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+grouped_linear = gals_highM[['stellar_mass','luminosity','SFR','SFR_Q','SFR_SB','lx/SFR','duty_cycle']].groupby(pd.cut(gals_highM.stellar_mass, np.append(np.arange(M_min, 11.5, 0.5),12.5)))#.quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
 
 # create dataframe of bootstraped linear varibles
 gals_bs=pd.DataFrame()
@@ -216,9 +228,9 @@ bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row['luminosity']/row['S
 
 # save dataframe to file and add to dictionary for use
 if methods['edd_ratio']=="Schechter":
-  bs_perc.to_csv(curr_dir+'/Ros_plots/'+sub_dir+f'bs_perc_z{z}_lambda{lambda_z:.2f}_alpha{alpha_z:.2f}.csv')
+  bs_perc.to_csv(curr_dir+'/Ros_plots/'+sub_dir+f'bs_perc_z{z}_lambda{lambda_z:.2f}_alpha{alpha_z:.2f}'+suffix+'.csv')
 elif methods['edd_ratio']=="Gaussian":
-  bs_perc.to_csv(curr_dir+'/Ros_plots/'+sub_dir+f'bs_perc_z{z}_mean{alpha_z:.2f}_sigma{lambda_z:.2f}.csv')
+  bs_perc.to_csv(curr_dir+'/Ros_plots/'+sub_dir+f'bs_perc_z{z}_mean{alpha_z:.2f}_sigma{lambda_z:.2f}'+suffix+'.csv')
 
 ################################
 ## Plot ##
@@ -354,4 +366,4 @@ plt.yscale('log')
 plt.xlabel('SFR (M$_\odot$/yr)')
 plt.ylabel('L$_X$ (2-10 keV) / $10^{42}$ (erg/s)')
 plt.legend(loc='upper left');
-plt.savefig(curr_dir+'/Ros_plots/'+sub_dir+f'SFvsLX_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
+plt.savefig(curr_dir+'/Ros_plots/'+sub_dir+f'SFvsLX_z{z}'+suffix+'.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 

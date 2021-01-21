@@ -240,12 +240,13 @@ def halo_mass_to_stellar_mass(halo_mass, z=0, formula="Grylls19", scatter=0.11):
         internal_stellar_mass += np.random.normal(scale=0.15, size=np.shape(internal_stellar_mass))
     return internal_stellar_mass
 
-def stellar_mass_to_black_hole_mass(stellar_mass, method="Shankar16", scatter="Intrinsic",slope=3.05,norm=7.25):
+def stellar_mass_to_black_hole_mass(stellar_mass, method="Shankar16", scatter="Intrinsic",slope=3.05,norm=7.45):
     """ Function to assign black hole mass from the stellar mass.
     :param stellar_mass: array, of stellar masses [log10 M_sun]
     :param method: string, specifying the method to be used, current options are "Shankar16",  "KormondyHo" and "Eq4".
     :param scatter: string or float, string should be "Intrinsic", float value specifies the (fixed) scatter magnitude
-    :slope and norm: float, used to test Davis relation
+    :slope: float, used to test Davis relation
+    :norm: float, used to test Reines&Volonteri15 relation
     :return: array, of the black hole masses [log10 M_sun].
     """
 
@@ -260,7 +261,7 @@ def stellar_mass_to_black_hole_mass(stellar_mass, method="Shankar16", scatter="I
     elif method == "Davis18":
        # Davis+18, eq. 3
        # log_black_hole_mass = 7.25 + 3.05 * (stellar_mass - 10.8) # original equation
-       log_black_hole_mass = norm + slope * (stellar_mass - 10.8)
+       log_black_hole_mass = 7.25 + slope * (stellar_mass - 10.8)
        log_black_hole_mass += np.random.normal(0., 1.6, len(stellar_mass))
     elif method == "Sahu19":
        # Sahu+19, Eq. 11, fig. 11 
@@ -268,7 +269,8 @@ def stellar_mass_to_black_hole_mass(stellar_mass, method="Shankar16", scatter="I
        log_black_hole_mass += np.random.normal(0., 1.2, len(stellar_mass))   
     elif method == "Reines&Volonteri15":
        # Eq. 4,5 and Fig 8 
-       log_black_hole_mass = 7.45 + 1.05 * (stellar_mass - 11.)
+       # log_black_hole_mass = 7.45 + 1.05 * (stellar_mass - 11.) # original equation
+       log_black_hole_mass = norm + 1.05 * (stellar_mass - 11.)
        log_black_hole_mass += np.random.normal(0., 1.1, len(stellar_mass))
 
     # Scatter
@@ -907,13 +909,27 @@ def SFR(z,Mstar, method='Tomczak16'):
 
 def SFR_Q(z,Mstar):
    # returns SFR in log scale
+   assert (z==0.45 or z == 1.0 or z==2.7),"Entered a wrong redshift value. SFR currently defined for z=0.45, z=1.0 or z=2.7."
    sig = 0.2 # intrinsic scatter in the relation in dex
-   return np.log10(0.37 *Mstar-3.6)+np.random.normal(0.,sig,len(Mstar))
+   if z==0.45:
+      return (0.40 *Mstar-4.5)+np.random.normal(0.,sig,len(Mstar))
+   if z==1.:
+      return (0.37 *Mstar-3.6)+np.random.normal(0.,sig,len(Mstar))
+   if z==2.7:
+      a=np.empty(Mstar.shape)
+      a.fill(np.nan)
+      return a
 
 def SFR_SB(z,Mstar):
    # returns SFR in log scale
+   assert (z==0.45 or z == 1.0 or z==2.7),"Entered a wrong redshift value. SFR currently defined for z=0.45, z=1.0 or z=2.7."
    sig = 0.2 # intrinsic scatter in the relation in dex
-   return np.log10(0.61 *Mstar-4.3)+np.random.normal(0.,sig,len(Mstar))
+   if z==0.45:
+      return (0.73 *Mstar-5.8)+np.random.normal(0.,sig,len(Mstar))
+   if z==1.:
+      return (0.61 *Mstar-4.3)+np.random.normal(0.,sig,len(Mstar))
+   if z==2.7:
+      return (0.59 *Mstar-3.4)+np.random.normal(0.,sig,len(Mstar))
 
 def schreiber(m,r,a0,a1,a2,m0,m1):
     return m - m0 + a0*r - a1*(np.maximum(0.,m-m1-a2*r))**2

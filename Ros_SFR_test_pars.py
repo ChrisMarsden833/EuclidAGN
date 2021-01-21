@@ -1,4 +1,3 @@
-
 from AGNCatalogToolbox import main as agn
 from AGNCatalogToolbox import Literature
 from colossus.cosmology import cosmology
@@ -37,7 +36,7 @@ data={}
 for key, val in read_data.items():
     data[key]=np.copy(val)
     data[key][data[key] == 0.] = np.nan
-print(data.keys())
+#print(data.keys())
 
 ################################
 # my cosmology
@@ -48,18 +47,22 @@ cosmo = 'Carraro+20'
 cosmology = cosmology.setCosmology(cosmo)
 volume = 200**3 # Mpc?
 
+## default suffix for filenames
+suffix=''
+
 ################################
 # import simulation parameters
-sub_dir='Sahu_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3 
-sub_dir='R&V_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3 
 sub_dir= 'R&V_Schechter/' 
 sub_dir= 'Sahu_Schechter/' 
 sub_dir= 'Davis_Schechter/'
 sub_dir= 'Standard_Gaussian/' 
 sub_dir='R&V_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3 
+sub_dir='Sahu_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3 
+sub_dir= 'Standard_Schechter/' # up to pars7
 sys.path.append(curr_dir+'/Ros_plots/'+sub_dir)
 
-from pars1 import *
+from pars7 import *
+print('z =',z)
 
 if methods['edd_ratio']=='Gaussian':
    lambda_z=sigma_z
@@ -81,7 +84,10 @@ gals['stellar_mass'] = agn.halo_mass_to_stellar_mass(gals.halos, z, formula=meth
 if M_inf > 0:
     gals=gals[gals['stellar_mass'] >= M_inf]
 if M_sup > 0:
-    gals=gals[gals['stellar_mass'] <= M_sup]
+    M_sup=np.min([12,M_sup])
+else:
+    M_sup=12
+gals=gals[gals['stellar_mass'] <= M_sup]
 print(gals.stellar_mass.min(),gals.stellar_mass.max())
 
 # BH
@@ -178,20 +184,25 @@ for par in parameters:
    # create dataframe for bootstrapping
    gals_highM=gals_lin.copy()[gals_lin.stellar_mass > M_min]
    grouped_linear = gals_highM[['stellar_mass','luminosity','SFR','SFR_Q','SFR_SB','lx/SFR','duty_cycle']].groupby(pd.cut(gals_highM.stellar_mass, np.append(np.arange(M_min, 11.5, 0.5),12.)))#.quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+   # sb mass bins [[9.5,10.25],[10.25,10.75],[10.75,11.5]]
+   grouped_SB = gals_highM[['stellar_mass','luminosity','SFR_SB','duty_cycle']].groupby(pd.cut(gals_highM.stellar_mass, np.array([9.5,10.25,10.75,11.5])))
 
    # create dataframe of bootstraped linear varibles
    gals_bs=pd.DataFrame()
+   gals_bs_SB=pd.DataFrame()
    
    func=np.median
    gals_bs['SFR'] = grouped_linear.SFR.apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
-   gals_bs['SFR_Q'] = grouped_linear.SFR_Q.apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
+   if z != 2.7:
+      gals_bs['SFR_Q'] = grouped_linear.SFR_Q.apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
    gals_bs['SFR_SB'] = grouped_linear.SFR_SB.apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
+   gals_bs_SB['SFR_SB'] = grouped_SB.SFR_SB.apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
 
    func=ws.weighted_median
    gals_bs['luminosity'] = grouped_linear.apply(lambda x: dcst.draw_bs_reps(x.luminosity, func, size=500,args=(x.duty_cycle,)))
-   # draw_bs_reps applies ws.weighted_median(bs_sample, weights=duty_cycle)
-   #gals_bs['luminosity'] = grouped_linear.luminosity.apply(lambda x: dcst.draw_bs_reps(x, func, size=500)) #with median
+   #gals_bs['luminosity'] = grouped_linear.luminosity.apply(lambda x: dcst.draw_bs_reps(x, func, size=500)) #old, with median
    gals_bs.head()
+   gals_bs_SB['luminosity'] = grouped_SB.apply(lambda x: dcst.draw_bs_reps(x.luminosity, func, size=500,args=(x.duty_cycle,)))
 
    # create dataframe with percentiles of the bootstrapped distribution
    bs_perc=ggals_lin['stellar_mass']
@@ -202,7 +213,13 @@ for par in parameters:
 
    bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs['SFR']]), 
                                     index=bs_perc.index, columns=pd.MultiIndex.from_product([['SFR'],perc_colnames])))
-   bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs['SFR_Q']]), 
+   if z != 2.7:
+      bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs['SFR_Q']]), 
+                                    index=bs_perc.index, columns=pd.MultiIndex.from_product([['SFR_Q'],perc_colnames])))
+   else:
+      a=np.empty((bs_perc.index.shape[0],len(perc_colnames)))
+      a.fill(np.nan)    
+      bs_perc=bs_perc.join(pd.DataFrame(np.array(a), 
                                     index=bs_perc.index, columns=pd.MultiIndex.from_product([['SFR_Q'],perc_colnames])))
    bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs['SFR_SB']]), 
                                     index=bs_perc.index, columns=pd.MultiIndex.from_product([['SFR_SB'],perc_colnames])))
@@ -211,13 +228,19 @@ for par in parameters:
    bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row['luminosity']/row['SFR'],[0.05,0.1585,0.5,0.8415,0.95]) 
                                                 for i,row in gals_bs.iterrows()]), 
                                     index=bs_perc.index, columns=pd.MultiIndex.from_product([['lx_SFR'],perc_colnames])))
-   #print(bs_perc)
+ 
+   # same for SB
+   #bs_perc=ggals_lin['stellar_mass']
+   #old_idx = bs_perc.columns.to_frame()
+   #perc_colnames=bs_perc.columns
+   #old_idx.insert(0, '', 'stellar_mass')
+   #bs_perc.columns = pd.MultiIndex.from_frame(old_idx)
 
    # save dataframe to file and add to dictionary for use
    if methods['edd_ratio']=="Schechter":
-      bs_perc.to_csv(curr_dir+'/Ros_plots/'+sub_dir+f'bs_perc_z{z}_lambda{lambda_z}_alpha{alpha_z}.csv')
+      bs_perc.to_csv(curr_dir+'/Ros_plots/'+sub_dir+f'bs_perc_z{z}_lambda{lambda_z}_alpha{alpha_z}'+suffix+'.csv')
    elif methods['edd_ratio']=="Gaussian":
-      bs_perc.to_csv(curr_dir+'/Ros_plots/'+sub_dir+f'bs_perc_z{z}_mean{alpha_z}_sigma{lambda_z}.csv')
+      bs_perc.to_csv(curr_dir+'/Ros_plots/'+sub_dir+f'bs_perc_z{z}_mean{alpha_z}_sigma{lambda_z}'+suffix+'.csv')
    df_dic[par_str+f'{par}']=bs_perc
 
 """
@@ -400,15 +423,15 @@ def SFR_LX(df_dic,data,m_min=2,leg_title=None,file_path='./'):
 if methods['edd_ratio']=="Schechter":
    if par_str == 'lambda':
       title_str=r'$\alpha$={}, z={}'.format(alpha_z,z)
-      file_name=curr_dir+'/Ros_plots/'+sub_dir+f'SFvsLX_z{z}_alpha{alpha_z}'+par_str+'.pdf'
+      file_name=curr_dir+'/Ros_plots/'+sub_dir+f'SFvsLX_z{z}_alpha{alpha_z}'+par_str+suffix+'.pdf'
    elif par_str == 'alpha':
       title_str=r'$\lambda$={}, z={}'.format(lambda_z,z)
-      file_name=curr_dir+'/Ros_plots/'+sub_dir+f'SFvsLX_z{z}_lambda{lambda_z}'+par_str+'.pdf'
+      file_name=curr_dir+'/Ros_plots/'+sub_dir+f'SFvsLX_z{z}_lambda{lambda_z}'+par_str+suffix+'.pdf'
 elif methods['edd_ratio']=="Gaussian":
    if par_str == 'sigma':
       title_str=r'$\mu$={}, z={}'.format(mu_z,z)
-      file_name=curr_dir+'/Ros_plots/'+sub_dir+f'SFvsLX_z{z}_mean{mu_z}'+par_str+'.pdf'
+      file_name=curr_dir+'/Ros_plots/'+sub_dir+f'SFvsLX_z{z}_mean{mu_z}'+par_str+suffix+'.pdf'
    elif par_str == 'mean':
       title_str=r'$\sigma$={}, z={}'.format(sigma_z,z)
-      file_name=curr_dir+'/Ros_plots/'+sub_dir+f'SFvsLX_z{z}_sigma{sigma_z}'+par_str+'.pdf'
+      file_name=curr_dir+'/Ros_plots/'+sub_dir+f'SFvsLX_z{z}_sigma{sigma_z}'+par_str+suffix+'.pdf'
 SFR_LX(df_dic,data,m_min=4,leg_title=title_str,file_path=file_name)
