@@ -43,3 +43,7 @@ lambda_z=lambda_pol(z)
 # mass range restrictions
 M_inf=0
 M_sup=0
+
+################################
+# filename suffix
+suffix=f'_slope{slope}'

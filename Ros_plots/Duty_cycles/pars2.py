@@ -103,3 +103,7 @@ elif methods['BH_mass_method']=="Sahu19":
 elif methods['BH_mass_method']=="Reines&Volonteri15":
     M_inf=10.
 print(M_inf,M_sup)
+
+################################
+# filename suffix
+suffix='_Georgakakis17'
