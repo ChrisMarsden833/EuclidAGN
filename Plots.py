@@ -74,7 +74,7 @@ plt.rcParams.update(params)
 text_pars=dict(horizontalalignment='left', verticalalignment='top', bbox=dict(facecolor='gray', alpha=0.5))
 # https://matplotlib.org/3.1.0/gallery/lines_bars_and_markers/linestyles.html
 ls=['--', '-.', ':', (0, (5, 10)), (0, (3, 5, 1, 5, 1, 5)), (0, (1, 10)), (0, (3, 1, 1, 1, 1, 1)), (0, (3, 1, 1, 1)), (0, (3, 5, 3, 5, 1, 5, 1, 5)), (0, (3, 10, 1, 10, 1, 10)),'--', '-.', ':', (0, (5, 10)), (0, (3, 5, 1, 5, 1, 5)), (0, (1, 10)), (0, (3, 1, 1, 1, 1, 1)), (0, (3, 1, 1, 1)), (0, (3, 5, 3, 5, 1, 5, 1, 5)), (0, (3, 10, 1, 10, 1, 10))]
-cols = plt.cm.tab10.colors
+cols = plt.cm.tab10.colors +plt.cm.tab10.colors +plt.cm.tab10.colors
 markers = ["o","^","p","P","*","h","X","D","8"]
 
 # change color map
@@ -111,7 +111,7 @@ def get_cycle(cmap, N=None, use_index="auto"):
         return cycler("color",colors)
 
 # read files as dataframes
-def read_dfs(paths,keys=None):
+def read_dfs(paths,keys=None,sigma=True):
     #read and place in dictionary
     if keys:
       dictionary={}
@@ -128,11 +128,27 @@ def read_dfs(paths,keys=None):
          df=pd.read_csv(p,header=[0,1],index_col=0)
          df.columns.set_levels(df.columns.levels[1].astype(float),level=1,inplace=True)
          pars=dict(re.findall(pattern, p))
+         if '_SB.csv' in p:
+            new_key='SB '
+         elif '_Q.csv' in p:
+            new_key='Q '
+         else:
+            new_key=''
+
          if 'Gaussian' in p:
-            df_dict[fr"Gaussian $\mu={pars['mean']}$, $\sigma={pars['sigma']}$"]=df
+            if 'norm' in pars.keys():
+               new_key+=fr"norm={pars['norm']}; Gaussian $\mu={pars['mean']}$, $\sigma={pars['sigma']}$"
+               df_dict[new_key]=df
+            else:
+               if sigma:
+                  new_key+=fr"Gaussian $\mu={pars['mean']}$, $\sigma={pars['sigma']}$"
+               else:
+                  new_key+=fr"Gaussian $\mu={pars['mean']}$"
+               df_dict[new_key]=df
             #df_dict[fr"Gaussian $\mu={pars['mean']}$"]=df
          else:
-            df_dict[fr"Schechter $x*={pars['lambda']}$, $\alpha={pars['alpha']}$"]=df
+            new_key+=fr"Schechter $x*={pars['lambda']}$, $\alpha={pars['alpha']}$"
+            df_dict[new_key]=df
 
       return df_dict
 
@@ -142,30 +158,18 @@ def comp_subplot(ax,df_dic,method_legend=None,leg_title=None,m_min=2,i=0,Q=False
 
     # "real" datapoints
     if Q or SB:
-       label='SF Carraro et al. (2020)'
-    else:
-       label='Carraro et al. (2020)'
-    ax.scatter(data['m_ave'][0,m_min:,i], data['l_ave'][0,m_min:,i], edgecolors='Black', marker="s",label=label)
-    ax.errorbar(data['m_ave'][0,m_min:,i], data['l_ave'][0,m_min:,i],
-                    yerr=np.array([data['l_ave'][0,m_min:,i] - data['l_ave'][2,m_min:,i], 
-                        data['l_ave'][1,m_min:,i] - data['l_ave'][0,m_min:,i]]),
-                    linestyle='solid', zorder=0)
+      label='SF Carraro et al. (2020)' 
+    else: 
+      label='Carraro et al. (2020)'
+    subplot_data_LX(ax,data, label, marker='s',m_min=m_min)
 
     # "real" datapoints
     if Q==True:
-      ax.scatter(data_Q['m_ave'][0,m_min:,i], data_Q['l_ave'][0,m_min:,i], edgecolors='Black', marker="X",color=cols[0],label='Q Carraro et al. (2020)')
-      ax.errorbar(data_Q['m_ave'][0,m_min:,i], data_Q['l_ave'][0,m_min:,i],
-                     yerr=np.array([data_Q['l_ave'][0,m_min:,i] - data_Q['l_ave'][2,m_min:,i], 
-                           data_Q['l_ave'][1,m_min:,i] - data_Q['l_ave'][0,m_min:,i]]),
-                     linestyle='solid',color=cols[0], zorder=0)
+      subplot_data_LX(ax,data_Q, label='Q Carraro et al. (2020)', marker="X",m_min=m_min)
 
     # "real" datapoints
     if SB==True:
-      ax.scatter(data_SB['m_ave'][0,:,i], data_SB['l_ave'][0,:,i], edgecolors='Black', marker="d",color=cols[0],label='SB Carraro et al. (2020)')
-      ax.errorbar(data_SB['m_ave'][0,:,i], data_SB['l_ave'][0,:,i],
-                     yerr=np.array([data_SB['l_ave'][0,:,i] - data_SB['l_ave'][2,:,i], 
-                           data_SB['l_ave'][1,:,i] - data_SB['l_ave'][0,:,i]]),
-                     linestyle='solid',color=cols[0], zorder=0)
+      subplot_data_LX(ax,data_SB, label='SB Carraro et al. (2020)', marker="d",m_min=0)
 
     # simulated datasets
     for j,(s,df) in enumerate(df_dic.items()):
@@ -175,14 +179,23 @@ def comp_subplot(ax,df_dic,method_legend=None,leg_title=None,m_min=2,i=0,Q=False
          yerr=np.array([df['luminosity',0.5] - df['luminosity',0.05], 
                         df['luminosity',0.95] - df['luminosity',0.5]])
 
-         ax.scatter(df['stellar_mass',0.5],df['luminosity',0.5], edgecolors='Black', label=s)
+         ax.scatter(df['stellar_mass',0.5],df['luminosity',0.5], edgecolors='Black', label=s,color=cols[j+1])
          ax.errorbar(df['stellar_mass',0.5],df['luminosity',0.5], 
-                           yerr=yerr, linestyle=ls[j], zorder=0)
+                           yerr=yerr, linestyle=ls[j], zorder=0,color=cols[j+1])
 
     #plt.text(0.83, 0.41, f'z = {z:.1f}', transform=fig.transFigure, **text_pars)
     if method_legend:
-      ax.text(0.03, 0.965, f'z = {z:.1f}\n'+method_legend, transform=ax.transAxes, **text_pars)
-    ax.legend(loc='lower right',title=leg_title)
+      ax.text(0.03, 0.965, f'z = {z:.2f}\n'+method_legend, transform=ax.transAxes, **text_pars)
+    leg=ax.legend(loc='lower right',title=leg_title)
+    leg._legend_box.align= "left"
+    return
+
+def subplot_data_LX(ax,data, label, marker,m_min=2):
+    ax.scatter(data['m_ave'][0,m_min:,i], data['l_ave'][0,m_min:,i], edgecolors='Black', marker=marker,color=cols[0],label=label)
+    ax.errorbar(data['m_ave'][0,m_min:,i], data['l_ave'][0,m_min:,i],
+                    yerr=np.array([data['l_ave'][0,m_min:,i] - data['l_ave'][2,m_min:,i], 
+                        data['l_ave'][1,m_min:,i] - data['l_ave'][0,m_min:,i]]),
+                    linestyle='solid',color=cols[0], zorder=0)
     return
 
 #%%
@@ -195,19 +208,26 @@ def comp_plot(df_dic,method_legend=None,filename='Comparisons',leg_title=None,i=
     
     ax.set_yscale('log')
     #ax.set_ylim(3e-3,30)
-    #ax.set_xlim(9.3,11.25)
+    #ax.set_xlim(9.,11.25)
     ax.set_xlabel('<M$_*$> (M$_\odot$)')
     ax.set_ylabel('<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)')
     plt.savefig(curr_dir+'/Ros_plots/'+filename+f'_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) ;
     return
 #%%
 # Plot SFR vs LX
-def SFR_LX(df_dic,data,leg_title=None,m_min=2):
+#def SFR_LX(df_dic,data,leg_title=None,m_min=2):
+def SFR_LX(df_dic,data,leg_title=None,m_min=2,filename='SFvsLX',SB=[],Q=[]):
    handles=[]
 
    # define parameters for datapoints' colors and colorbar
    _min = np.nanmin(data['m_ave'][0,m_min:,:])
    _max = np.nanmax(data['m_ave'][0,m_min:,:])
+   if Q:
+      _min = np.minimum(np.nanmin(data_Q['m_ave'][0,m_min:,:]),_min)
+      _max = np.maximum(np.nanmax(data_Q['m_ave'][0,m_min:,:]),_max)
+   if SB:
+      _min = np.minimum(np.nanmin(data_SB['m_ave'][0,:,:]),_min)
+      _max = np.maximum(np.nanmax(data_SB['m_ave'][0,:,:]),_max)
    for s,bs_perc in df_dic.items():
       _min = np.minimum(np.nanmin(bs_perc['stellar_mass',0.5]),_min)
       _max = np.maximum(np.nanmax(bs_perc['stellar_mass',0.5]),_max)
@@ -216,32 +236,45 @@ def SFR_LX(df_dic,data,leg_title=None,m_min=2):
    #plt.rcParams['figure.figsize'] = [12, 8]
 
    for j,(s,bs_perc) in enumerate(df_dic.items()):
+      if s in SB:
+         SFR_str='SFR_SB'
+         s='SB '+s
+      elif s in Q:
+         SFR_str='SFR_Q'
+         s='Q '+s
+      else: 
+         if Q or SB:
+            s='SF '+s
+         SFR_str='SFR'
+
       # errorbars of bootstrapped simulation points
-      xerr=np.array([bs_perc['SFR',0.5] - bs_perc['SFR',0.05], 
-                  bs_perc['SFR',0.95] - bs_perc['SFR',0.5]])
+      xerr=np.array([bs_perc[SFR_str,0.5] - bs_perc[SFR_str,0.05], 
+                  bs_perc[SFR_str,0.95] - bs_perc[SFR_str,0.5]])
       yerr=np.array([bs_perc['luminosity',0.5] - bs_perc['luminosity',0.05], 
                      bs_perc['luminosity',0.95] - bs_perc['luminosity',0.5]])
 
       # simulated datapoints
-      data_pars=dict(marker=markers[j],linestyle=ls[j],color=cols[j+1])
-      plt.scatter(bs_perc['SFR',0.5],bs_perc['luminosity',0.5], vmin = _min, vmax = _max, marker=data_pars['marker'], edgecolors='Black',
+      data_pars=dict(marker=markers[j],linestyle=ls[j],color=cols[j+1], markeredgecolor='Black')
+      sc=plt.scatter(bs_perc[SFR_str,0.5],bs_perc['luminosity',0.5], vmin = _min, vmax = _max, marker=data_pars['marker'], edgecolors='Black',
                   c=bs_perc['stellar_mass',0.5] , s=bs_perc['stellar_mass',0.5]*10)
-      plt.errorbar(bs_perc['SFR',0.5],bs_perc['luminosity',0.5],
+      plt.errorbar(bs_perc[SFR_str,0.5],bs_perc['luminosity',0.5],
                      xerr=xerr, yerr=yerr, linestyle=data_pars['linestyle'], c=data_pars['color'], zorder=0)
-      handles += [mlines.Line2D([], [],markeredgecolor='Black', label=s, **data_pars)]
+      handles += [mlines.Line2D([], [], label=s, **data_pars)]
 
    # "real" datapoints
-   data_pars=dict(marker="s",linestyle='-')
-   sc=plt.scatter(data['sfr_ave'][0,m_min:,i], data['l_ave'][0,m_min:,i], vmin = _min, vmax = _max, edgecolors='Black',
-               c=data['m_ave'][0,m_min:,0], s=data['m_ave'][0,m_min:,0]*10, marker=data_pars['marker'])
-   plt.errorbar(data['sfr_ave'][0,m_min:,i], data['l_ave'][0,m_min:,i],
-                  xerr=[data['sfr_ave'][0,m_min:,i]-data['sfr_ave'][2,m_min:,i],
-                     data['sfr_ave'][1,m_min:,i]-data['sfr_ave'][0,m_min:,i]],
-                  yerr=np.array([data['l_ave'][0,m_min:,i] - data['l_ave'][2,m_min:,i], 
-                     data['l_ave'][1,m_min:,i] - data['l_ave'][0,m_min:,i]]),
-                  linestyle=data_pars['linestyle'], zorder=0, color=cols[0])
-   handles += [mlines.Line2D([], [], color=cols[0], markeredgecolor='Black',
-                              label='Carraro et al. (2020)',**data_pars)]
+   if Q or SB:
+      label='SF Carraro et al. (2020)' 
+   else: 
+      label='Carraro et al. (2020)'
+   handles+=subplot_data_SFR(data, label,marker="s",_min=_min,_max=_max,m_min=m_min)
+
+   if Q:
+      label='Q Carraro et al. (2020)'
+      handles+=subplot_data_SFR(data_Q, label,marker="X",_min=_min,_max=_max,m_min=m_min)
+
+   if SB:
+      label='SB Carraro et al. (2020)'
+      handles+=subplot_data_SFR(data_SB, label,marker="d",_min=_min,_max=_max,m_min=0)
 
    # colorbar, labels, legend, etc
    plt.colorbar(sc).set_label('Stellar mass (M$_\odot$)')
@@ -252,7 +285,20 @@ def SFR_LX(df_dic,data,leg_title=None,m_min=2):
    plt.xlabel('<SFR> (M$_\odot$/yr)')
    plt.ylabel('<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)')
    plt.legend(handles=handles, loc='lower right',title=leg_title,handlelength=3)
-   plt.savefig(curr_dir+f'/Ros_plots/SFvsLX_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
+   plt.savefig(curr_dir+'/Ros_plots/'+filename+f'_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
+
+def subplot_data_SFR(data, label, marker,_min,_max,m_min=2):
+   data_pars=dict(marker=marker,linestyle='-', markeredgecolor='Black', color=cols[0])
+   plt.scatter(data['sfr_ave'][0,m_min:,i], data['l_ave'][0,m_min:,i], vmin = _min, vmax = _max, edgecolors=data_pars['markeredgecolor'],
+               c=data['m_ave'][0,m_min:,0], s=data['m_ave'][0,m_min:,0]*10, marker=data_pars['marker'])
+   plt.errorbar(data['sfr_ave'][0,m_min:,i], data['l_ave'][0,m_min:,i],
+                  xerr=[data['sfr_ave'][0,m_min:,i]-data['sfr_ave'][2,m_min:,i],
+                     data['sfr_ave'][1,m_min:,i]-data['sfr_ave'][0,m_min:,i]],
+                  yerr=np.array([data['l_ave'][0,m_min:,i] - data['l_ave'][2,m_min:,i], 
+                     data['l_ave'][1,m_min:,i] - data['l_ave'][0,m_min:,i]]),
+                  linestyle=data_pars['linestyle'], zorder=0, color=data_pars['color'])
+   handle = [mlines.Line2D([], [], label=label,**data_pars)]
+   return handle
 
 """
 #%%
@@ -270,9 +316,7 @@ df_dic = read_dfs(paths,keys)
 leg_title='Scaling relation'
 
 SFR_LX(df_dic,data,leg_title)
-"""
 #%%
-"""
 ###############################
 ######### Fig 1 ###############
 ###############################
@@ -289,6 +333,7 @@ leg_title='Scaling relation'
 SFR_LX(df_dic,data,leg_title, m_min = 4)
 
 #%%
+"""
 ###############################
 ######### Fig 2 ###############
 ###############################
@@ -305,8 +350,7 @@ fig,axs = plt.subplots(2,2,figsize=[15, 10], sharex=True, sharey=True, gridspec_
 ##########################################################
 # top-left
 paths = glob.glob(curr_dir+f'/Ros_plots/Standard/bs_perc_z{z}*.csv') + sorted(glob.glob(curr_dir+f'/Ros_plots/Scaling_rels/bs_perc_z{z}*.csv') )
-#paths = sorted(paths)
-print(paths)
+#print(paths)
 keys=['Shankar et al. (2016)', 'Davis et al. (2018)', 'Reines & Volonteri (2015)', 'Sahu et al. (2019)']
 #read DFs
 df_dic = read_dfs(paths,keys)
@@ -320,7 +364,7 @@ comp_subplot(axs[0,0],df_dic,leg_title=leg_title,i=i)
 # # Gaussian width Edd ratio distributions comparison
 paths = glob.glob(curr_dir+f'/Ros_plots/Standard/bs_perc_z{z}*.csv') + glob.glob(curr_dir+f'/Ros_plots/Standard_Gaussian/bs_perc_z{z}*.csv')
 paths = sorted(paths)
-print(paths)
+
 #read DFs
 df_dic = read_dfs(paths)
 
@@ -333,7 +377,7 @@ comp_subplot(axs[0,1],df_dic,leg_title=leg_title,i=i)
 # define DF path
 paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Davis_slope/bs_perc_z{z}*.csv'))
 paths = sorted(paths, reverse=True)
-print(paths)
+
 keys=['Davis et al. (2018) extended',r'Slope $\beta=2.5$',r'Slope $\beta=2.0$',r'Slope $\beta=1.5$',r'Slope $\beta=1.0$']
 #read DFs
 df_dic = read_dfs(paths,keys)
@@ -347,7 +391,7 @@ comp_subplot(axs[1,0],df_dic,leg_title=leg_title,i=i)
 # Duty Cycle comparison
 paths = glob.glob(curr_dir+f'/Ros_plots/Standard/bs_perc_z{z}*.csv') + glob.glob(curr_dir+f'/Ros_plots/Duty_Cycles/bs_perc_z{z}_lambda-0.80_alpha1.60*.csv')
 #paths = sorted(paths)
-print(paths)
+
 keys=['Schulze et al. (2015)','Georgakakis et al. (2017)','Man et al. (2019)','const=0.2']
 #read DFs
 df_dic = read_dfs(paths,keys)
@@ -360,7 +404,7 @@ comp_subplot(axs[1,1],df_dic,leg_title=leg_title,i=i)
 #axs[-1, 0].set_xlabel('.', color=(0, 0, 0, 0))
 #axs[-1, 0].set_ylabel('.', color=(0, 0, 0, 0))
 # common lables:
-fig.text(0.5, 0.08, r'$\log$ <M$_*$> (M$_\odot$)', va='center', ha='center',size='x-large')
+fig.text(0.5, 0.07, r'$\log$ <M$_*$> (M$_\odot$)', va='center', ha='center',size='x-large')
 fig.text(0.08, 0.5, '<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)', va='center', ha='center', rotation='vertical',size='x-large')
 plt.ylim(2.1e-6,9e2)
 plt.yscale('log')
@@ -380,6 +424,7 @@ plt.rcParams.update(params)
 reds_dic={0.45:0, 1:1, 1.7:2, 2.7:3}
 # make 2x3 comparison plots
 fig,axs = plt.subplots(2,3,figsize=[15, 10], sharex=True, sharey=True, gridspec_kw={'hspace': 0, 'wspace': 0})
+sigma=False # don't show the standard deviation of the gaussian in the legend of the plots
 
 ##########################################################
 # top
@@ -392,10 +437,10 @@ paths = glob.glob(curr_dir+f'/Ros_plots/Sahu_Gaussian/bs_perc_z{z}*.csv')
 paths = sorted(paths)
 #print(paths)
 #read DFs
-df_dic = read_dfs(paths)
+df_dic = read_dfs(paths,sigma=sigma)
 
 #method_legend=f"Halo to M*: {methods['halo_to_stars']}\nDuty Cycle: {methods['duty_cycle']}\nBH_mass: {methods['BH_mass_method']}\nBol corr: {methods['bol_corr']}"
-leg_title=f"z = {z:.1f}\nBH_mass: {methods['BH_mass_method']}"
+leg_title=f"z = {z:.2f}"+"\n"+rf"M$_{{\rm BH}}$-M$_*$: {methods['BH_mass_method']}"
 comp_subplot(axs[0,0],df_dic,leg_title=leg_title,m_min=4,i=i)
 
 ##########################################################
@@ -406,9 +451,9 @@ paths = glob.glob(curr_dir+f'/Ros_plots/Sahu_Gaussian/bs_perc_z{z}*.csv')
 paths = sorted(paths)
 #print(paths)
 #read DFs
-df_dic = read_dfs(paths)
+df_dic = read_dfs(paths,sigma=sigma)
 
-leg_title=f"z = {z:.1f}\nBH_mass: {methods['BH_mass_method']}"
+leg_title=f"z = {z:.2f}"+"\n"+rf"M$_{{\rm BH}}$-M$_*$: {methods['BH_mass_method']}"
 comp_subplot(axs[0,1],df_dic,leg_title=leg_title,m_min=4,i=i)
 
 ##########################################################
@@ -420,9 +465,9 @@ paths = glob.glob(curr_dir+f'/Ros_plots/Sahu_Gaussian/bs_perc_z{z}*.csv')
 paths = sorted(paths)
 #print(paths)
 #read DFs
-df_dic = read_dfs(paths)
+df_dic = read_dfs(paths,sigma=sigma)
 
-leg_title=f"z = {z:.1f}\nBH_mass: {methods['BH_mass_method']}"
+leg_title=f"z = {z:.2f}"+"\n"+rf"M$_{{\rm BH}}$-M$_*$: {methods['BH_mass_method']}"
 comp_subplot(axs[0,2],df_dic,leg_title=leg_title,m_min=4,i=i)
 ##########################################################
 # common lables:
@@ -445,9 +490,9 @@ paths = glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}*.csv')
 paths = sorted(paths)
 #print(paths)
 #read DFs
-df_dic = read_dfs(paths)
+df_dic = read_dfs(paths,sigma=sigma)
 
-leg_title=f"z = {z:.1f}\nBH_mass: {methods['BH_mass_method']}"
+leg_title=f"z = {z:.2f}"+"\n"+rf"M$_{{\rm BH}}$-M$_*$: {methods['BH_mass_method']}"
 comp_subplot(axs[1,0],df_dic,leg_title=leg_title,m_min=4,i=i)
 
 ##########################################################
@@ -458,9 +503,9 @@ paths = glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}*.csv')
 paths = sorted(paths)
 #print(paths)
 #read DFs
-df_dic = read_dfs(paths)
+df_dic = read_dfs(paths,sigma=sigma)
 
-leg_title=f"z = {z:.1f}\nBH_mass: {methods['BH_mass_method']}"
+leg_title=f"z = {z:.2f}"+"\n"+rf"M$_{{\rm BH}}$-M$_*$: {methods['BH_mass_method']}"
 comp_subplot(axs[1,1],df_dic,leg_title=leg_title,m_min=4,i=i)
 
 ##########################################################
@@ -472,14 +517,14 @@ paths = glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}*.csv')
 paths = sorted(paths)
 #print(paths)
 #read DFs
-df_dic = read_dfs(paths)
+df_dic = read_dfs(paths,sigma=sigma)
 
-leg_title=f"z = {z:.1f}\nBH_mass: {methods['BH_mass_method']}"
+leg_title=f"z = {z:.2f}"+"\n"+rf"M$_{{\rm BH}}$-M$_*$: {methods['BH_mass_method']}"
 comp_subplot(axs[1,2],df_dic,leg_title=leg_title,m_min=4,i=i)
 ##########################################################
 # common lables:
-fig.text(0.5, 0.05, r'$\log$ <M$_*$> (M$_\odot$)', va='center', ha='center',size='x-large')
-fig.text(0.06, 0.5, '<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)', va='center', ha='center', rotation='vertical',size='x-large')
+fig.text(0.5, 0.07, r'$\log$ <M$_*$> (M$_\odot$)', va='center', ha='center',size='x-large')
+fig.text(0.07, 0.5, '<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)', va='center', ha='center', rotation='vertical',size='x-large')
 plt.ylim(5e-4,1.8e2)
 plt.yscale('log')
 plt.savefig(curr_dir+f'/Ros_plots/fig3.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) ;
@@ -488,7 +533,6 @@ plt.savefig(curr_dir+f'/Ros_plots/fig3.pdf', format = 'pdf', bbox_inches = 'tigh
 z = 1.
 i=reds_dic.get(z)
 methods['BH_mass_method']="Shankar et al. (2016)"
-"""
 #%%
 #####################################################
 ############ Test lambda char ############
@@ -503,7 +547,7 @@ paths = [curr_dir+f'/Ros_plots/02_First_draft_circulation/R&V_Schechter/bs_perc_
 paths = sorted(paths)
 df_dic = read_dfs(paths)
 
-method_legend=f"BH_mass: Reines & Volonteri (2015)"
+method_legend=r"M$_{\rm BH}$-M$_*$: Reines & Volonteri (2015)"
 leg_title='Eddington ratio distribution'
 
 comp_plot(df_dic,method_legend,filename='Comparison_lambdachar',leg_title=leg_title,i=i)
@@ -512,10 +556,53 @@ comp_plot(df_dic,method_legend,filename='Comparison_lambdachar',leg_title=leg_ti
 ######################################################################
 ############ Compare SF,Q,SB to Reines&Volonteri relation ############
 ######################################################################
+# plot global properties
+plt.rcParams["axes.prop_cycle"] = get_cycle("tab10")
+params = {'legend.fontsize': 'medium',
+          'legend.title_fontsize':'medium'}
+plt.rcParams.update(params)
+
+method_legend=f"BH_mass: Reines & Volonteri (2015)"
+leg_title='Eddington ratio distribution'
+zees=[1.0,2.7]
+# # Comparison between LX-M* relation of SF,Q,SB galaxies
+for z in zees:
+   i=reds_dic.get(z)
+   paths =glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_*_sigma0.3.csv') 
+   paths = sorted(paths)
+   #read DFs
+   df_dic = read_dfs(paths)
+
+   comp_plot(df_dic,method_legend,filename=f'Comparison_SFQSB_z{z}',leg_title=leg_title,i=i,Q=True,SB=True,m_min=3)
+
+#%%
+######################################################################
+############ Compare SF,Q,SB LX-SFR relation ############
+######################################################################
+# Comparison of Eddington ratio distributions SFR vs LX for different galazy types
+# define DF path
+z = 1.0
+i=reds_dic.get(z)
+paths = [curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-1.5_sigma0.3.csv',
+         curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-1.75_sigma0.3.csv.bak',
+         curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-2.5_sigma0.3.csv']
+#read DFs
+df_dic = read_dfs(paths)
+#print(df_dic.keys())
+leg_title='Eddington ratio distribution'
+sb_list=['Gaussian $\\mu=-1.5$, $\\sigma=0.3$']
+q_list=['Gaussian $\\mu=-2.5$, $\\sigma=0.3$']
+
+SFR_LX(df_dic,data,leg_title, m_min = 4,filename='SFR_LX_SFQSB',SB=sb_list,Q=q_list)
+
+#%%
+##########################################################################################
+############ Compare SF,Q,SB to Reines&Volonteri relation varying its normalization ############
+##########################################################################################
 # # Comparison between LX-M* relation of SF,Q,SB galaxies
 z = 1.0
 i=reds_dic.get(z)
-paths =glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_*_sigma0.3.csv') 
+paths =[curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-1.75_sigma0.3.csv.bak'] +glob.glob(curr_dir+f'/Ros_plots/Test_R&V_Gaussian_SFQSB/bs_perc_z{z}_*.csv') 
 paths = sorted(paths)
 #read DFs
 df_dic = read_dfs(paths)
@@ -523,8 +610,25 @@ df_dic = read_dfs(paths)
 method_legend=f"BH_mass: Reines & Volonteri (2015)"
 leg_title='Eddington ratio distribution'
 
-comp_plot(df_dic,method_legend,filename=f'Comparison_SFQSB_z{z}',leg_title=leg_title,i=i,Q=True,SB=True,m_min=3)
+comp_plot(df_dic,method_legend,filename=f'Comparison_SFQSB_z{z}_norm',leg_title=leg_title,i=i,Q=True,SB=True,m_min=3)
+#%%
+##################################################################################
+############ Compare SF,Q,SB LX-SFR relation varying R&V normalization ############
+##################################################################################
+# Comparison of Eddington ratio distributions SFR vs LX for different galazy types
+# define DF path
+z = 1.0
+paths = [curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-1.75_sigma0.3.csv.bak',
+         curr_dir+f'/Ros_plots/Test_R&V_Gaussian_SFQSB/bs_perc_z{z}_mean-1.75_sigma0.30_norm6.75.csv',
+         curr_dir+f'/Ros_plots/Test_R&V_Gaussian_SFQSB/bs_perc_z{z}_mean-1.75_sigma0.30_norm7.75.csv']
+#read DFs
+df_dic = read_dfs(paths)
 
+leg_title='Eddington ratio distribution'
+sb_list=['norm=7.75; Gaussian $\\mu=-1.75$, $\\sigma=0.30$']
+q_list=['norm=6.75; Gaussian $\\mu=-1.75$, $\\sigma=0.30$']
+
+SFR_LX(df_dic,data,leg_title, m_min = 4,filename='SFR_LX_SFQSB_norm',SB=sb_list,Q=q_list)
 #%%
 #####################################################
 ############ Test scatter Mh-M* ############
