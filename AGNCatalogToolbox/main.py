@@ -323,10 +323,12 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
             # Find the nearest file to the redshift we want
             schulze_path = data_path + utl.GetCorrectFile("Schulze", z, data_path)
             df = pd.read_csv(schulze_path, header=None)
+            df.sort_values(by=[0], inplace=True)  # sort by MBH
             schulze_black_hole_mass = df[0].values
             schulze_duty_cycle = df[1].values
             get_u = interpolate.interp1d(schulze_black_hole_mass, schulze_duty_cycle, bounds_error=False,
-                                            fill_value=(schulze_duty_cycle[-1], schulze_duty_cycle[0]))
+                                            fill_value=(schulze_duty_cycle[0], schulze_duty_cycle[-1]))
+            #print(f'U({np.max(black_hole_mass)})={get_u(np.max(black_hole_mass))}, U({np.min(black_hole_mass)})={get_u(np.min(black_hole_mass))}')
             duty_cycle = 10 ** get_u(black_hole_mass)
             
         elif method == "Geo":
@@ -363,13 +365,16 @@ def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshif
            return 10.**(alpha*(x-llambda))*np.exp(-10.**(x-llambda))
 
         norm_fac=quad(Schechter, np.min(edd), np.max(edd), args=(arg1,arg2))
+        #norm_fac1=np.sum(Schechter(edd,arg1,arg2)*(edd[1]-edd[0]))
 
         # plot schechter and cumulative
         #plt.figure()
         #plt.yscale('log')
-        #plt.plot(edd,Schechter(edd,arg1,arg2))
-        #plt.plot(edd,(((10.**edd) / (10. ** arg1)) ** arg2)* np.exp(-((10.**edd) / (10. ** arg1))))
-        #plt.plot(edd,np.cumsum(Schechter(edd,arg1,arg2)/norm_fac[0]*(edd[1]-edd[0])))
+        #plt.plot(edd,Schechter(edd,arg1,arg2),label='Schechter')
+        #plt.plot(edd,Schechter(edd,arg1,arg2)/norm_fac[0],label='Norm Schechter mio')
+        #plt.plot(edd,Schechter(edd,arg1,arg2)/norm_fac1,label='Norm Schechter Viola')
+        #plt.plot(edd,np.cumsum(Schechter(edd,arg1,arg2)/norm_fac[0]*(edd[1]-edd[0])),label='Cumulative')
+        #plt.legend()
         #plt.show()
 
         return Schechter(edd,arg1,arg2)/norm_fac[0]
@@ -380,6 +385,14 @@ def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshif
            return np.exp(-(x - mean) ** 2. / (2.*sigma ** 2.))
 
         norm_fac=quad(Gaussian, np.min(edd), np.max(edd), args=(arg1,arg2))
+
+        # plot Gaussian and cumulative
+        #plt.figure()
+        #plt.plot(edd,Gaussian(edd,arg1,arg2),label='Gaussian')
+        #plt.plot(edd,np.cumsum(Gaussian(edd,arg1,arg2)/norm_fac[0]*(edd[1]-edd[0])),label='Cumulative')
+        #plt.plot(edd,Gaussian(edd,arg1,arg2)/norm_fac[0],label='Norm Gaussian')
+        #plt.legend()
+        #plt.show()
 
         return Gaussian(edd,arg1,arg2)/norm_fac[0]
         #return np.exp(-(edd - arg2) ** 2. / (2.*arg1 ** 2.))
@@ -413,12 +426,12 @@ def black_hole_mass_to_luminosity(black_hole_mass, z=0, method="Schechter",
     
     l_edd = 38.1072 + black_hole_mass # log(L_Edd) [erg/s]
 
-    binning=0.001
-    edd_bin = np.arange(-4, 0, binning)
+    binning=0.0001
+    edd_bin = np.arange(-4, 1, binning)
     #prob_schechter_function = edd_schechter_function(10 ** edd_bin, method=method, arg1=parameter1, arg2=parameter2,
     prob_schechter_function = edd_schechter_function(edd_bin, method=method, arg1=parameter1, arg2=parameter2,
                                                    redshift_evolution=redshift_evolution, z=z)
-    #p = prob_schechter_function * (10**0.0001)
+    #p = prob_schechter_function# * (10**0.0001)
     #r_prob = p[::-1]
     #prob_cum = np.cumsum(r_prob)
     #r_prob_cum = prob_cum[::-1]
@@ -430,8 +443,19 @@ def black_hole_mass_to_luminosity(black_hole_mass, z=0, method="Schechter",
       print(f'ATTENTION!!! Normalization went wrong, cumulative goes up to {y[-1]} instead of 1')
    
     # characteristic lambda
-    lambda_char=np.cumsum(prob_schechter_function*edd_bin*binning) # Pn(x)*log(x)*dlog(x)
-    #print(f'characteristic log(lambda) for this eddington distribution: {lambda_car[-1]:.2f}')
+    if method=="Schechter":
+      #lin_bin=np.diff(10**edd_bin, append=0.0023021)#, prepend=2.3025e-08
+      #lambda_char=np.cumsum(prob_schechter_function*(10**edd_bin)*lin_bin) # Pn(x)*x*dx  # x=lambda (lin scale)
+      #print(f'characteristic lambda (lin) for this eddington distribution: {lambda_char[-1]}')
+      lambda_char=np.cumsum(prob_schechter_function*(10**edd_bin)*binning) # Pn(x)*x*dlog(x)  # x=lambda (lin scale)
+      print(f'characteristic log(lambda) (linear integ.) for alpha={parameter2:2f}, lambda={parameter1:2f}: {np.log10(lambda_char[-1]):.2f}')
+      lambda_char=np.cumsum(prob_schechter_function*edd_bin*binning) # Pn(x)*log(x)*dlog(x)
+      print(f'characteristic log(lambda) for alpha={parameter2:2f}, lambda={parameter1:2f}: {lambda_char[-1]:.2f}')
+    else: # Gaussian
+      lambda_char=np.cumsum(prob_schechter_function*(10**edd_bin)*binning) # Pn(x)*log(x)*dlog(x)
+      print(f'characteristic log(lambda) (linear integ.) for mean={parameter2:2f}, sigma={parameter1:2f}: {np.log10(lambda_char[-1]):.2f}')
+      lambda_char=np.cumsum(prob_schechter_function*edd_bin*binning) # Pn(x)*log(x)*dlog(x)
+      print(f'characteristic log(lambda) for mean={parameter2:2f}, sigma={parameter1:2f}: {lambda_char[-1]:.2f}')
 
     a = np.random.random(len(black_hole_mass))
     y2edd_bin = interpolate.interp1d(y, edd_bin, bounds_error=False, fill_value=(edd_bin[0], edd_bin[-1]))
@@ -439,6 +463,14 @@ def black_hole_mass_to_luminosity(black_hole_mass, z=0, method="Schechter",
     l_bol = lg_edd + l_edd
     #np.save('l_bol.npy',l_bol)
     #print(f'lum_min={np.min(l_bol)}, lum_max={np.max(l_bol)}')
+
+    #plt.hist(lg_edd)
+    #plt.ylabel('lg_edd')
+    #plt.show()
+
+    #plt.hist(l_bol)
+    #plt.ylabel('l_bol')
+    #plt.show()
 
     if bol_corr == 'Marconi04':
        #eq 21
