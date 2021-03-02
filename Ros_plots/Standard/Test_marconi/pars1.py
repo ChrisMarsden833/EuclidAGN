@@ -13,7 +13,7 @@ methods={'halo_to_stars':'Grylls19', # 'Grylls19' or 'Moster'
     'BH_mass_scatter':"Intrinsic", # "Intrinsic" or float
     'duty_cycle':"Schulze", # "Schulze", "Man16", "Geo" or float (0.18)
     'edd_ratio':"Schechter", # "Schechter", "PowerLaw", "Gaussian", "Geo"
-    'bol_corr':'Lusso12_modif', # 'Duras20', 'Marconi04', 'Lusso12_modif'
+    'bol_corr':'Marconi04', # 'Duras20', 'Marconi04', 'Lusso12_modif'
     'SFR':'Carraro20' # 'Tomczak16', "Schreiber15", "Carraro20"
     }
 

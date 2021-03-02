@@ -77,6 +77,9 @@ if methods['edd_ratio']=='Gaussian':
     sigma_z = 0.3 # sigma
     mu_z = 0.25 # mean edd
 
+alpha_z=0.15
+lambda_z=0.1
+
 #if methods['BH_mass_method']=="Davis18":
 #    slope=1.
 

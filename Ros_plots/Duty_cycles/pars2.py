@@ -80,6 +80,9 @@ if methods['edd_ratio']=='Gaussian':
 #if methods['BH_mass_method']=="Davis18":
 #    slope=1.
 
+alpha_z=0.15
+lambda_z=0.1
+
 if methods['edd_ratio']=="Schechter":
    print(f'lambda_z={lambda_z}, alpha_z={alpha_z}')
 elif methods['edd_ratio']=="Gaussian":

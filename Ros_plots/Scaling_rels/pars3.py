@@ -37,6 +37,9 @@ lambda_pol=np.poly1d(lambda_pars)
 alpha_z=alpha_pol(z)
 lambda_z=lambda_pol(z)
 
+alpha_z=0.15
+lambda_z=0.1
+
 
 ################################
 # mass range restrictions

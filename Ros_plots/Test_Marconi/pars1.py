@@ -1,4 +1,4 @@
-# set pars for z=1, Standard config but with log gaussian, varying sigma with mean=-1.5
+# set pars for z=1, Shankar, Schechter changing lambda, alpha=-1.5
 
 import numpy as np
 
@@ -13,8 +13,8 @@ def get_pars():
       'BH_mass_method':"Shankar16", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
       'BH_mass_scatter':"Intrinsic", # "Intrinsic" or float
       'duty_cycle':"Schulze", # "Schulze", "Man16", "Geo" or float (0.18)
-      'edd_ratio':"Gaussian", # "Schechter", "PowerLaw", "Gaussian", "Geo"
-      'bol_corr':'Lusso12_modif', # 'Duras20', 'Marconi04', 'Lusso12_modif'
+      'edd_ratio':"Schechter", # "Schechter", "PowerLaw", "Gaussian", "Geo"
+      'bol_corr':'Marconi04', # 'Duras20', 'Marconi04', 'Lusso12_modif'
       'SFR':'Carraro20' # 'Tomczak16', "Schreiber15", "Carraro20"
       }
 
@@ -25,15 +25,15 @@ def get_pars():
       #variable_name = r"$\alpha$"
       #par_str= 'alpha'
    elif methods['edd_ratio']=="Gaussian":
-      variable_name = r"$\sigma$"
-      par_str= 'sigma'
-      #variable_name = r"$\mu$"
-      #par_str= 'mean'
-   parameters = [0.1,0.3,0.5,0.7,1.0,2.0,3.0]
+      #variable_name = r"$\sigma$"
+      #par_str= 'sigma'
+      variable_name = r"$\mu$"
+      par_str= 'mean'
+   parameters = [-1.0,-0.5,0.,0.1,0.2,0.3,0.4,0.5,1.0]
 
    ################################
    # Edd ratio parameters definition:
-   if methods['edd_ratio']=='Schechter' and (methods['duty_cycle']=="Schulze" or methods['duty_cycle']=="Geo") and (methods['BH_mass_method']=="Shankar16" or methods['BH_mass_method']=="Davis18" or methods['BH_mass_method']=="Sahu19" or methods['BH_mass_method']=="Reines&Volonteri15"):
+   #if methods['edd_ratio']=='Schechter' and (methods['duty_cycle']=="Schulze" or methods['duty_cycle']=="Geo") and (methods['BH_mass_method']=="Shankar16" or methods['BH_mass_method']=="Davis18" or methods['BH_mass_method']=="Sahu19" or methods['BH_mass_method']=="Reines&Volonteri15"):
       #fitting:
       #redshift = [0.1, 1, 2]
       #alpha = [-0.25,1.6,7.14]
@@ -42,31 +42,24 @@ def get_pars():
       #lambda_pars=np.polyfit(redshift,lambd,2)
       #np.savez('schechter_pars.npz',alpha_pars=alpha_pars,lambda_pars=lambda_pars)
 
-      schechter_pars=np.load('schechter_pars.npz')
-      alpha_pars=schechter_pars['alpha_pars']
-      lambda_pars=schechter_pars['lambda_pars']
+      #schechter_pars=np.load('schechter_pars.npz')
+      #alpha_pars=schechter_pars['alpha_pars']
+      #lambda_pars=schechter_pars['lambda_pars']
 
-      alpha_pol=np.poly1d(alpha_pars)
-      lambda_pol=np.poly1d(lambda_pars)
+      #alpha_pol=np.poly1d(alpha_pars)
+      ###lambda_pol=np.poly1d(lambda_pars)
 
-      alpha_z=alpha_pol(z)
-      lambda_z=lambda_pol(z)
+      ##alpha_z=alpha_pol(z)
+      #lambda_z=lambda_pol(z)
 
-   if methods['edd_ratio']=='Gaussian':
-      sigma_z = 0.3 # sigma
-      mu_z = -1.5 # mean edd
-
-   if methods['edd_ratio']=="Schechter":
-      print(f'lambda_z={lambda_z}, alpha_z={alpha_z}')
-   elif methods['edd_ratio']=="Gaussian":
-      print(f'sigma={sigma_z}, mu_z={mu_z}')
+   alpha_z=-1.5
+   lambda_z=0.1
 
 
    ################################
    # mass range restrictions
    M_inf=0
    M_sup=0
-   """
    if z==2.7:
       M_inf=10.
    elif methods['BH_mass_method']=="Shankar16":
@@ -79,10 +72,8 @@ def get_pars():
       M_sup=12.15
    elif methods['BH_mass_method']=="Reines&Volonteri15":
       M_inf=10.
-   print(M_inf,M_sup)
-   """
+   print('z = ',z)
 
-   if methods['edd_ratio']=='Gaussian':
-      lambda_z=sigma_z
-      alpha_z=mu_z
+
+   #defs={'z':z, 'methods':methods, 'M_inf':M_inf, 'M_sup':M_sup,'alpha_z':alpha_z,'lambda_z':lambda_z}
    return  z, methods, M_inf, M_sup,alpha_z,lambda_z,variable_name,par_str,parameters
