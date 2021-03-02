@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import dc_stat_think as dcst
 import weightedstats as ws 
 from scipy import interpolate
+#from scipy.stats import binned_statistic
+import scipy as sp
 
 curr_dir=os.getcwd()
 
@@ -58,15 +60,15 @@ sub_dir='Sahu_Gaussian/' # z=1: pars1. z=2.7 :pars2. z=0.45:pars3
 sub_dir= 'R&V_Schechter/' # z=1: pars1. 
 sub_dir= 'Scaling_rels_bestLF/'
 sub_dir= 'Scaling_rels_restr/'
-sub_dir= 'Duty_cycles/'
-sub_dir= 'Standard/'
 sub_dir='Test_R&V_Gaussian_SFQSB/' # up to pars11
+sub_dir= 'Standard/Test_marconi/'
+sub_dir= 'Standard/'
 sub_dir= 'Scaling_rels/'
 sub_dir= 'Duty_cycles/'
 sub_dir= 'Davis_slope/'
 sys.path.append(curr_dir+'/Ros_plots/'+sub_dir)
 
-from pars5 import *
+from pars2 import *
 
 if methods['edd_ratio']=='Gaussian':
    lambda_z=sigma_z
@@ -80,8 +82,17 @@ gals = pd.DataFrame()
 # Halos
 gals['halos'] = agn.generate_semi_analytic_halo_catalogue(volume, [10, 16, 0.1], z, params.get('H0')/100)
 
+#plt.hist(gals['halos'])
+#plt.ylabel('halos')
+#plt.show()
+
 # Galaxies
 gals['stellar_mass'] = agn.halo_mass_to_stellar_mass(gals.halos, z, formula=methods['halo_to_stars'])
+
+#plt.hist(gals['stellar_mass'])
+#plt.ylabel('stellar_mass')
+#plt.show()
+
 
 # limit mass range to validity of scaling relation
 if M_inf > 0:
@@ -92,6 +103,10 @@ else:
     M_sup=12
 gals=gals[gals['stellar_mass'] <= M_sup]
 print(gals.stellar_mass.min(),gals.stellar_mass.max())
+
+#plt.hist(gals['stellar_mass'])
+#plt.ylabel('stellar_mass >10')
+#plt.show()
 
 # BH
 if slope is not None:
@@ -106,16 +121,40 @@ else:
    gals['black_hole_mass'] = agn.stellar_mass_to_black_hole_mass(gals.stellar_mass, method = methods['BH_mass_method'], 
                                                                   scatter = methods['BH_mass_scatter'])
 
+#plt.hist(gals['black_hole_mass'])
+#plt.ylabel('black_hole_mass')
+#plt.show()
+
 # Duty cycles
 gals['duty_cycle'] = agn.to_duty_cycle(methods['duty_cycle'], gals.stellar_mass, gals.black_hole_mass, z)
+
+#plt.hist(gals['duty_cycle'])
+#plt.ylabel('duty_cycle')
+#plt.show()
 
 gals['luminosity'], lambda_char, _ = agn.black_hole_mass_to_luminosity(
                                           gals.black_hole_mass, 
                                           z, methods['edd_ratio'],
                                           bol_corr=methods['bol_corr'], parameter1=lambda_z, parameter2=alpha_z)
                                           #bol_corr=methods['bol_corr'], parameter1=sigma_z, parameter2=mu_z)
-"""
+
+#plt.hist(gals['luminosity'])
+#plt.ylabel('luminosity')
+#plt.show()
+#%%
 ###############
+# determine XLF
+step = 0.2
+bins = np.arange(42., 46., step)
+#lum_bins = binned_statistic(gals['luminosity'], gals['duty_cycle'], 'sum', bins=bins)[0]
+lum_bins = sp.stats.binned_statistic(gals['luminosity'], gals['duty_cycle'], 'sum', bins=bins)[0]
+lum_func = (lum_bins/volume)/step
+bins1 = bins[0:-1][lum_func > 0]
+lum1 = np.log10(lum_func[lum_func > 0])
+
+from AGNCatalogToolbox import Utillity as utl
+xlf_plotting_data = utl.PlottingData(bins[0:-1][lum_func > 0], np.log10(lum_func[lum_func > 0]))
+
 # plot XLF
 plt.figure()
 # XLF Data
@@ -126,7 +165,7 @@ plt.plot(mXLF_data.x, mXLF_data.y, 'o', label = "Miyaji")
 uXLF_data = XLF.get_ueda14(np.arange(42, 46, 0.1))
 plt.plot(uXLF_data.x, uXLF_data.y, ':', label = "Ueda")
 
-plt.plot(10**XLF_plotting_data.x, 10**XLF_plotting_data.y, label = 'Simulation')# finish plot
+plt.plot(10**xlf_plotting_data.x, 10**xlf_plotting_data.y, label = 'Simulation')# finish plot
 plt.xlabel(r'$L_x\;[erg\;s^{-1}]$')
 plt.ylabel(r'$d\phi /d(log\;L_x)\;[Mpc^{-3}]$')
 plt.loglog()
@@ -138,22 +177,23 @@ elif methods['edd_ratio']=="Gaussian":
    title_str=r'XLF, U={}, $\mu$={}, $\sigma$={}, z={}'.format(methods['duty_cycle'],mu_z,sigma_z,z)
    file_name=curr_dir+'/Ros_plots/'+sub_dir+f'XLF_z{z}_mean{mu_z:.2f}_sigma{sigma_z:.2f}.pdf'
 plt.title(title_str)
+print(file_name)
 plt.savefig(file_name, format = 'pdf', bbox_inches = 'tight',transparent=True)
 #plt.show()
 #################
 # do squared distance from Miyaji
-XLF_plot_int=interpolate.interp1d(10**XLF_plotting_data.x, 10**XLF_plotting_data.y)
-good_ones=np.logical_and((mXLF_data.x>=10**XLF_plotting_data.x[0]), (mXLF_data.x<=10**XLF_plotting_data.x[-1]))
+XLF_plot_int=interpolate.interp1d(10**xlf_plotting_data.x, 10**xlf_plotting_data.y)
+good_ones=np.logical_and((mXLF_data.x>=lum_bins[0]), (mXLF_data.x<=lum_func[-1]))
 mXLF_x=mXLF_data.x[good_ones]
 XLF_sim=XLF_plot_int(mXLF_x)
 S=np.sum((np.log10(XLF_sim)-np.log10(mXLF_data.y[good_ones]))**2)
-"""
+#%%
 #Save to file the characteristic lambda
-print(f'lambda{lambda_z:.2f}_alpha{alpha_z:.2f}:\tlambda_char={lambda_char:.2f}')#, Squares sum={S:.2e}
+print(f'lambda{lambda_z:.2f}_alpha{alpha_z:.2f}:\tlambda_char={lambda_char:.3f}')#, Squares sum={S:.2e}
 if methods['edd_ratio']=="Schechter":
-   append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, lambda={lambda_z:.2f}, alpha={alpha_z:.2f}:\tlambda_char={lambda_char:.2f}')#, Squares sum={S:.2e}
+   append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, lambda={lambda_z:.2f}, alpha={alpha_z:.2f}:\tlambda_char={lambda_char:.3f}')#, Squares sum={S:.2e}
 elif methods['edd_ratio']=="Gaussian":
-   append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, mean={alpha_z:.2f}, sigma={lambda_z:.2f}:\tlambda_char={lambda_char:.2f}')#, Squares sum={S:.2e}
+   append_new_line(curr_dir+'/Ros_plots/'+sub_dir+'Squared_test.txt', f'z={z}, mean={alpha_z:.2f}, sigma={lambda_z:.2f}:\tlambda_char={lambda_char:.3f}')#, Squares sum={S:.2e}
 
 #gals['nh'] = agn.luminosity_to_nh(gals.luminosity, z)
 #gals['agn_type'] = agn.nh_to_type(gals.nh)
@@ -228,9 +268,9 @@ bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row['luminosity']/row['S
 
 # save dataframe to file and add to dictionary for use
 if methods['edd_ratio']=="Schechter":
-  bs_perc.to_csv(curr_dir+'/Ros_plots/'+sub_dir+f'bs_perc_z{z}_lambda{lambda_z:.2f}_alpha{alpha_z:.2f}'+suffix+'.csv')
+  bs_perc.to_csv(curr_dir+'/Ros_plots/'+sub_dir+f'bs_perc_z{z}_lambda{lambda_z:.2f}_alpha{alpha_z:.2f}_lambdac{lambda_char:.3f}'+suffix+'.csv')
 elif methods['edd_ratio']=="Gaussian":
-  bs_perc.to_csv(curr_dir+'/Ros_plots/'+sub_dir+f'bs_perc_z{z}_mean{alpha_z:.2f}_sigma{lambda_z:.2f}'+suffix+'.csv')
+  bs_perc.to_csv(curr_dir+'/Ros_plots/'+sub_dir+f'bs_perc_z{z}_mean{alpha_z:.2f}_sigma{lambda_z:.2f}_lambdac{lambda_char:.3f}'+suffix+'.csv')
 
 ################################
 ## Plot ##
