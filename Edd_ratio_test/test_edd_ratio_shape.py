@@ -115,7 +115,7 @@ corr_final = np.concatenate((corr_final,corr_high))
 # table1, (Klbol),general
 pars = [10.96, 11.93, 17.79]
 k_corr = pars[0]*(1+((lbol_final - 33.485)/pars[1])**pars[2])
-
+print(k_corr[10:50])
 # %%
 
 plt.plot(Lbol2_erg,10**bol_corr2) #type2
@@ -126,7 +126,6 @@ plt.yscale('log')
 plt.xlim(34,48.6)
 
 plt.plot(lbol_final,k_corr);
-
 # %%
 l_bol=np.load('l_bol.npy')
 print(l_bol[:10])
