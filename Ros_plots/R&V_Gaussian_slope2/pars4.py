@@ -1,4 +1,4 @@
-# set pars for z=1, Standard config but with log gaussian, varying sigma with mean=-1.5
+# set pars for z=1, Reines&Volonteri15 with log gaussian, varying sigma with mean=-1.5
 
 import numpy as np
 
@@ -10,7 +10,7 @@ def get_pars():
    index=reds_dic.get(z) # needed for IDL data
 
    methods={'halo_to_stars':'Grylls19', # 'Grylls19' or 'Moster'
-      'BH_mass_method':"Shankar16", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
+      'BH_mass_method':"Reines&Volonteri15", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
       'BH_mass_scatter':"Intrinsic", # "Intrinsic" or float
       'duty_cycle':"Schulze", # "Schulze", "Man16", "Geo" or float (0.18)
       'edd_ratio':"Gaussian", # "Schechter", "PowerLaw", "Gaussian", "Geo"
@@ -30,6 +30,8 @@ def get_pars():
       #variable_name = r"$\mu$"
       #par_str= 'mean'
    parameters = [0.1,0.3,0.5,0.7,1.0,2.0,3.0]
+   
+   slope=2.0
 
    ################################
    # Edd ratio parameters definition:
@@ -85,4 +87,4 @@ def get_pars():
    if methods['edd_ratio']=='Gaussian':
       lambda_z=sigma_z
       alpha_z=mu_z
-   return  z, methods, M_inf, M_sup,alpha_z,lambda_z,variable_name,par_str,parameters
+   return  z, methods, M_inf, M_sup,alpha_z,lambda_z,variable_name,par_str,parameters,slope
