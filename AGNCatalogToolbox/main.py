@@ -237,20 +237,20 @@ def halo_mass_to_stellar_mass(halo_mass, z=0, formula="Grylls19", scatter=0.11):
         print("Scatter is a thing, valued at {}".format(scatter))
         internal_stellar_mass += np.random.normal(scale=scatter, size=np.shape(internal_stellar_mass))
         # add measure error (for comparison with data)
-        internal_stellar_mass += np.random.normal(scale=0.15, size=np.shape(internal_stellar_mass))
+        internal_stellar_mass += np.random.normal(scale=.15, size=np.shape(internal_stellar_mass))
     return internal_stellar_mass
 
-def stellar_mass_to_black_hole_mass(stellar_mass, method="Shankar16", scatter="Intrinsic",slope=3.05,norm=7.45):
+def stellar_mass_to_black_hole_mass(stellar_mass, method="Shankar16", scatter="Intrinsic",slope=1.05,norm=7.45):
     """ Function to assign black hole mass from the stellar mass.
     :param stellar_mass: array, of stellar masses [log10 M_sun]
     :param method: string, specifying the method to be used, current options are "Shankar16",  "KormondyHo" and "Eq4".
     :param scatter: string or float, string should be "Intrinsic", float value specifies the (fixed) scatter magnitude
-    :slope: float, used to test Davis relation
+    :slope: float, used to test Reines&Volonteri15 relation
     :norm: float, used to test Reines&Volonteri15 relation
     :return: array, of the black hole masses [log10 M_sun].
     """
 
-    # Main values
+    # Main formula
     if method == "Shankar16":
         log_black_hole_mass = 7.574 + 1.946 * (stellar_mass - 11) - 0.306 * (stellar_mass - 11)**2. \
                               - 0.011 * (stellar_mass - 11)**3
@@ -260,8 +260,7 @@ def stellar_mass_to_black_hole_mass(stellar_mass, method="Shankar16", scatter="I
         log_black_hole_mass = 8.35 + 1.31 * (stellar_mass - 11)
     elif method == "Davis18":
        # Davis+18, eq. 3
-       # log_black_hole_mass = 7.25 + 3.05 * (stellar_mass - 10.8) # original equation
-       log_black_hole_mass = 7.25 + slope * (stellar_mass - 10.8)
+       log_black_hole_mass = 7.25 + 3.05 * (stellar_mass - 10.8) # original equation
        log_black_hole_mass += np.random.normal(0., 1.6, len(stellar_mass))
     elif method == "Sahu19":
        # Sahu+19, Eq. 11, fig. 11 
@@ -270,7 +269,7 @@ def stellar_mass_to_black_hole_mass(stellar_mass, method="Shankar16", scatter="I
     elif method == "Reines&Volonteri15":
        # Eq. 4,5 and Fig 8 
        # log_black_hole_mass = 7.45 + 1.05 * (stellar_mass - 11.) # original equation
-       log_black_hole_mass = norm + 1.05 * (stellar_mass - 11.)
+       log_black_hole_mass = norm + slope * (stellar_mass - 11.)
        log_black_hole_mass += np.random.normal(0., 1.1, len(stellar_mass))
 
     # Scatter
@@ -279,6 +278,7 @@ def stellar_mass_to_black_hole_mass(stellar_mass, method="Shankar16", scatter="I
             # The intrinsic formula for scatter given in FS's relation
             scatter = (0.32 - 0.1 * (stellar_mass - 12.)) * np.random.normal(0., 1., len(stellar_mass))
         else:
+            print('scatter')
             scatter = np.random.normal(0, 0.5, len(stellar_mass))
     elif isinstance(type(scatter), float):
         scatter = np.random.normal(0., scatter, len(stellar_mass))
@@ -304,6 +304,8 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
     :return: array, the duty cycle [dimensionless]
     """
 
+    plt.figure()
+
     method_type = type(method)
     if method_type is float or method_type is int:
         duty_cycle = np.ones_like(stellar_mass) * method
@@ -317,7 +319,10 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
             mann_duty_cycle = df[1].values
             get_u = interpolate.interp1d(mann_stellar_mass, mann_duty_cycle, bounds_error=False,
                                             fill_value=(mann_duty_cycle[0], mann_duty_cycle[-1]))
-            duty_cycle = get_u(stellar_mass)
+            duty_cycle = get_u(stellar_mass) #+ np.random.normal(0., 0.1, len(stellar_mass))
+            plt.plot(stellar_mass, duty_cycle, '.', label = "Mocks",alpha=0.2)
+            plt.plot(mann_stellar_mass, mann_duty_cycle, '-', label = "Model")
+            plt.xlabel(r'$M_*\;[M_\odot]$')
 
         elif method == "Schulze":
             # Find the nearest file to the redshift we want
@@ -328,8 +333,13 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
             schulze_duty_cycle = df[1].values
             get_u = interpolate.interp1d(schulze_black_hole_mass, schulze_duty_cycle, bounds_error=False,
                                             fill_value=(schulze_duty_cycle[0], schulze_duty_cycle[-1]))
+            if (get_u(np.max(black_hole_mass)) > np.min(schulze_duty_cycle)) or (get_u(np.min(black_hole_mass)) < np.max(schulze_duty_cycle)):
+               print('WARNING: Something is wrong with the duty cycle')
             #print(f'U({np.max(black_hole_mass)})={get_u(np.max(black_hole_mass))}, U({np.min(black_hole_mass)})={get_u(np.min(black_hole_mass))}')
             duty_cycle = 10 ** get_u(black_hole_mass)
+            plt.plot(black_hole_mass, duty_cycle, '.', label = "Mocks",alpha=0.2)
+            plt.plot(schulze_black_hole_mass, 10**schulze_duty_cycle, '-', label = "Model")
+            plt.xlabel(r'$M_{BH}\;[M_\odot]$')
             
         elif method == "Geo":
             geo_stellar_mass, geo_duty_cycle = utl.ReadSimpleFile("Geo17DC", z, data_path)
@@ -337,10 +347,19 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
                                             fill_value=(geo_duty_cycle[0], geo_duty_cycle[-1]))
 
             duty_cycle = 10 ** get_u(stellar_mass)
+            plt.plot(stellar_mass, duty_cycle, '.', label = "Mocks",alpha=0.2)
+            plt.plot(geo_stellar_mass, 10**geo_duty_cycle, '-', label = "Model")
+            plt.xlabel(r'$M_*\;[M_\odot]$')
         else:
             assert False, "Unknown Duty Cycle Type {}".format(method)
     else:
         assert False, "No duty cycle type specified"
+
+    plt.legend()
+    plt.ylabel('Duty cycle')
+    plt.yscale('log')
+    plt.title(f'{method}, z={z}')
+    plt.savefig(f'Duty_cycles_{method}_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True)
   
     assert len(duty_cycle[(duty_cycle < 0) * (duty_cycle > 1)]) == 0, \
         "{} Duty Cycle elements outside of the range 0-1 exist. This is a probability, so this is not valid. Values: {}"\
@@ -348,7 +367,7 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
 
     return duty_cycle
 
-def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshift_evolution=False, z=0, data_path="./Data/"):
+def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, arg3=1, redshift_evolution=False, z=0, data_path="./Data/"):
     #gammaE = arg2
     #A = 10. ** (-1.41)
     #prob = ((edd / (10. ** arg1)) ** arg2)
@@ -379,7 +398,12 @@ def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshif
 
         return Schechter(edd,arg1,arg2)/norm_fac[0]
     elif method == "PowerLaw":
-        return prob
+        def powerlaw(x,gamma1,gamma2,lbreak):
+           return ((10**x/lbreak)**gamma1+(10**x/lbreak)**gamma2)**(-1)
+
+        norm_fac=quad(powerlaw, np.min(edd), np.max(edd), args=(arg1,arg2,arg3))
+        return powerlaw(edd,arg1,arg2)/norm_fac[0]
+
     elif method == "Gaussian":
         def Gaussian(x,sigma,mean):
            return np.exp(-(x - mean) ** 2. / (2.*sigma ** 2.))
@@ -407,7 +431,7 @@ def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, redshif
 def black_hole_mass_to_luminosity(black_hole_mass, z=0, method="Schechter",
                                   bol_corr='Duras20',
                                   redshift_evolution=False,
-                                  parameter1=-1, parameter2=-0.65):
+                                  parameter1=-1, parameter2=-0.65,parameter3=1,lambda_min=-4):
     """ Function to assign the eddington ratios and X-ray luminosity (2-10KeV) from black hole mass.
 
     :param black_hole_mass: array, the black hole mass (log10)
@@ -427,9 +451,9 @@ def black_hole_mass_to_luminosity(black_hole_mass, z=0, method="Schechter",
     l_edd = 38.1072 + black_hole_mass # log(L_Edd) [erg/s]
 
     binning=0.0001
-    edd_bin = np.arange(-4, 1, binning)
+    edd_bin = np.arange(lambda_min, 1, binning)
     #prob_schechter_function = edd_schechter_function(10 ** edd_bin, method=method, arg1=parameter1, arg2=parameter2,
-    prob_schechter_function = edd_schechter_function(edd_bin, method=method, arg1=parameter1, arg2=parameter2,
+    prob_schechter_function = edd_schechter_function(edd_bin, method=method, arg1=parameter1, arg2=parameter2, arg3=parameter3,
                                                    redshift_evolution=redshift_evolution, z=z)
     #p = prob_schechter_function# * (10**0.0001)
     #r_prob = p[::-1]
