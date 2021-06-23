@@ -1,5 +1,6 @@
 from AGNCatalogToolbox import main as agn
 from AGNCatalogToolbox import Literature
+from AGNCatalogToolbox.Ros_utilities import *
 from colossus.cosmology import cosmology
 import os
 import sys
@@ -26,19 +27,6 @@ def convert_var_file(var_file):
    vars=open(var_file).read()       
    exec(vars,globals()) 
    return
-
-def append_new_line(file_name, text_to_append):
-    """Append given text as a new line at the end of file"""
-    # Open the file in append & read mode ('a+')
-    with open(file_name, "a+") as file_object:
-        # Move read cursor to the start of file.
-        file_object.seek(0)
-        # If file is not empty then append '\n'
-        data = file_object.read(100)
-        if len(data) > 0:
-            file_object.write("\n")
-        # Append text at the end of file
-        file_object.write(text_to_append)
 
 def simulation(var_file):
    from colossus.cosmology import cosmology
@@ -84,7 +72,7 @@ def simulation(var_file):
    module=re.findall(pattern, var_file)
    mod=import_module(module[0]) # module is a list
    get_pars=getattr(mod,"get_pars")
-   z, methods, M_inf, M_sup,alpha_z,lambda_z,variable_name,par_str,parameters = get_pars()
+   z, methods, M_inf, M_sup,alpha_z,lambda_z,variable_name,par_str,parameters,slope = get_pars()
    #print('z =',z,'M_sup =',M_sup)
 
    # needed for IDL data
@@ -118,9 +106,18 @@ def simulation(var_file):
    #print(gals.stellar_mass.min(),gals.stellar_mass.max())
 
    # BH
-   gals['black_hole_mass'] = agn.stellar_mass_to_black_hole_mass(gals.stellar_mass, method = methods['BH_mass_method'], 
-                                                                                 scatter = methods['BH_mass_scatter'],)#slope=slope,norm=norm
-
+   if slope is not None:
+      if methods['BH_mass_method'] != 'Reines&Volonteri15': print('Warning! slope parameter is meant to be used with Reines&Volonteri15 relation only')
+      gals['black_hole_mass'] = agn.stellar_mass_to_black_hole_mass(gals.stellar_mass, method = methods['BH_mass_method'], 
+                                                                     scatter = methods['BH_mass_scatter'],slope=slope)
+   #elif norm is not None:
+   #   if methods['BH_mass_method'] != 'Reines&Volonteri15': print('Warning! slope parameter is meant to be used with Reines&Volonteri15 relation only')
+   #   gals['black_hole_mass'] = agn.stellar_mass_to_black_hole_mass(gals.stellar_mass, method = methods['BH_mass_method'], 
+   #                                                                  scatter = methods['BH_mass_scatter'],norm=norm)
+   else:
+      gals['black_hole_mass'] = agn.stellar_mass_to_black_hole_mass(gals.stellar_mass, method = methods['BH_mass_method'], 
+                                                                     scatter = methods['BH_mass_scatter'])
+   
    # Duty cycles
    gals['duty_cycle'] = agn.to_duty_cycle(methods['duty_cycle'], gals.stellar_mass, gals.black_hole_mass, z)
 
@@ -145,7 +142,7 @@ def simulation(var_file):
       gals_tmp= gals.copy()
 
       #gals_tmp['luminosity'] = agn.black_hole_mass_to_luminosity(gals_tmp.black_hole_mass, 
-      gals_tmp['luminosity'], lambda_char, _ = agn.black_hole_mass_to_luminosity(
+      gals_tmp['luminosity'], lambda_char, gals_tmp['edd_ratio'] = agn.black_hole_mass_to_luminosity(
                                              gals_tmp.black_hole_mass, 
                                              z, methods['edd_ratio'],
                                              bol_corr=methods['bol_corr'], parameter1=lambda_z, parameter2=alpha_z)
@@ -199,7 +196,6 @@ def simulation(var_file):
       # grouping in mass bins - log units
       #grouped_gals = gals_tmp[['stellar_mass','luminosity','SFR','lx/SFR','duty_cycle']].groupby(pd.cut(gals_tmp.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
 
-
       #print('linearizing ')
       # converting to linear units
       gals_lin=pd.DataFrame()
@@ -209,76 +205,100 @@ def simulation(var_file):
       gals_lin[['SFR','lx/SFR']]=10**gals_tmp[['SFR','lx/SFR']]
       gals_lin['SFR_Q'] = 10**(gals_tmp.SFR_Q)
       gals_lin['SFR_SB'] = 10**(gals_tmp.SFR_SB)
+      gals_lin['black_hole_mass'] = gals_tmp['black_hole_mass']
+      gals_lin['edd_ratio']=gals_tmp['edd_ratio']
 
-      # grouping linear table
-      grouped_lin = gals_lin[['stellar_mass','luminosity','SFR','SFR_Q','SFR_SB','lx/SFR','duty_cycle']].groupby(
-                           pd.cut(gals_tmp.stellar_mass, np.append(np.arange(5, 11.5, 0.5),12.))).quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
-      # limit to logM>9
-      ggals_lin=grouped_lin[grouped_lin['stellar_mass',0.5] > 9]
-      grouped_lin.index.rename('mass_range',inplace=True)
+      dfs_dict=dict(SF='',Q='_Q',SB='_SB')
+      bs_perc=pd.DataFrame()
 
-      ################################
-      ## Bootstrapping ##
-      ################################
-      M_min=np.max([9,M_inf])
-      #print('bootstrapping ')
+      for key, str in dfs_dict.items():
+         sfr_str='SFR'+str
+         mstar_str='stellar_mass'+str
+         lum_str='luminosity'+str
+         lambda_str='lambda_ave'+str
 
-      # create dataframe for bootstrapping
-      gals_highM=gals_lin.copy()[gals_lin.stellar_mass > M_min]
-      grouped_linear = gals_highM[['stellar_mass','luminosity','SFR','SFR_Q','SFR_SB','lx/SFR','duty_cycle']].groupby(pd.cut(gals_highM.stellar_mass, np.append(np.arange(M_min, 11.5, 0.5),12.)))#.quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
-      # sb mass bins [[9.5,10.25],[10.25,10.75],[10.75,11.5]]
-      grouped_SB = gals_highM[['stellar_mass','luminosity','SFR_SB','duty_cycle']].groupby(pd.cut(gals_highM.stellar_mass, np.array([9.5,10.25,10.75,11.5])))
+	      # remove galaxies with lx < lx_binaries, as of Lehmer+16, from both dfs
+         gals_lin['lx_bin']=10**(29.37+2.03*np.log10(1+z)+gals_lin.stellar_mass-42)+10**(39.28+1.31*np.log10(1+z)+gals_tmp[sfr_str]-42)
+	      #α0(1 + z)γ M∗ + β0(1 + z)δSFR, (3)
+	      #with logα0 = 29.37, logβ0 = 39.28, γ = 2.03, and δ = 1.31.
+         to_drop=gals_lin['luminosity']<=gals_lin['lx_bin']
+         print(f'Fraction galaxies with LX<LX_bin: {to_drop.sum()/(gals_lin.shape[0]):.3f}')
+		      
+         gals_lin_tmp=gals_lin.copy()[gals_lin['luminosity']>gals_lin['lx_bin']]
+         gals_lin_tmp=gals_lin_tmp[gals_lin_tmp['stellar_mass']>9]
 
-      # create dataframe of bootstraped linear varibles
-      gals_bs=pd.DataFrame()
-      #gals_bs_SB=pd.DataFrame()
-      
-      func=np.median
-      gals_bs['SFR'] = grouped_linear.SFR.apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
-      if z != 2.7:
-         gals_bs['SFR_Q'] = grouped_linear.SFR_Q.apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
-      gals_bs['SFR_SB'] = grouped_linear.SFR_SB.apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
-      #gals_bs_SB['SFR_SB'] = grouped_SB.SFR_SB.apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
+         ################################
+         ## Bootstrapping ##
+         ################################
+         M_min=np.max([9,M_inf])
+         #print('bootstrapping ')
 
-      #print('weighted mean')
-      func=ws.weighted_median
-      gals_bs['luminosity'] = grouped_linear.apply(lambda x: dcst.draw_bs_reps(x.luminosity, func, size=500,args=(x.duty_cycle,)))
-      #gals_bs['luminosity'] = grouped_linear.luminosity.apply(lambda x: dcst.draw_bs_reps(x, func, size=500)) #old, with median
-      gals_bs.head()
-      #gals_bs_SB['luminosity'] = grouped_SB.apply(lambda x: dcst.draw_bs_reps(x.luminosity, func, size=500,args=(x.duty_cycle,)))
+         # create dataframe for bootstrapping
+         gals_highM=gals_lin_tmp.copy()[gals_lin_tmp.stellar_mass > M_min]
+         grouped_linear = gals_highM[['stellar_mass','black_hole_mass','luminosity','SFR','SFR_Q','SFR_SB','lx/SFR','duty_cycle','edd_ratio']].groupby(pd.cut(gals_highM.stellar_mass, np.append(np.arange(M_min, 11.5, 0.5),12.)))#.quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+         # sb mass bins [[9.5,10.25],[10.25,10.75],[10.75,11.5]]
+         print(f'Statistics for mock sample mean={alpha_z} sigma={lambda_z}:')
+         print(gals_highM[['stellar_mass','black_hole_mass','duty_cycle']].describe(percentiles=[.01,.05,.25, .5, .75,.95,.99]))
+         
+         """
+         # plot masses
+         stellar_mass=np.linspace(gals_highM['stellar_mass'].min(),gals_highM['stellar_mass'].max())
+         plt.figure()
+         plt.scatter(gals_highM['stellar_mass'],gals_highM['black_hole_mass'],label='Mock galaxies',alpha=0.2,s=0.2)
+         plt.plot(stellar_mass,7.574 + 1.946 * (stellar_mass - 11.) - 0.306 * (stellar_mass - 11.)**2.- 0.011 * (stellar_mass - 11.)**3,label='Shankar+16',c='Orange')
+         plt.ylabel('black_hole_mass')
+         plt.xlabel('stellar_mass')
+         #plt.xlim(10,gals_highM['stellar_mass'].max())
+         #plt.ylim(3.4,gals_highM['black_hole_mass'].max()+0.2)
+         plt.legend()
+         file_name=curr_path+f'masses_rel_mean{alpha_z}_sigma{lambda_z}'+suffix+'.pdf'
+         plt.savefig(file_name, format = 'pdf', bbox_inches = 'tight',transparent=True)
+         """
 
-      #print('creating percentiles')
-      # create dataframe with percentiles of the bootstrapped distribution
-      bs_perc=ggals_lin['stellar_mass']
-      old_idx = bs_perc.columns.to_frame()
-      perc_colnames=bs_perc.columns
-      old_idx.insert(0, '', 'stellar_mass')
-      bs_perc.columns = pd.MultiIndex.from_frame(old_idx)
+         # create dataframe of bootstraped linear varibles
+         gals_bs=pd.DataFrame()
+         
+         func=np.median
+         if not ((z == 2.7) and (key=='Q')):
+            gals_bs[sfr_str] = grouped_linear[sfr_str].apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
+            
+         #gals_bs[lum_str] = grouped_linear.apply(lambda x: my_draw_bs_reps(x.luminosity.values,x.duty_cycle.values, size=500))
+         gals_bs[lum_str] = grouped_linear.apply(lambda x: my_draw_bs_reps(x.luminosity.values,x.duty_cycle.values, size=500,type='mean'))
+         gals_bs.head()
 
-      bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs['SFR']]), 
-                                       index=bs_perc.index, columns=pd.MultiIndex.from_product([['SFR'],perc_colnames])))
-      if z != 2.7:
-         bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs['SFR_Q']]), 
-                                       index=bs_perc.index, columns=pd.MultiIndex.from_product([['SFR_Q'],perc_colnames])))
-      else:
-         a=np.empty((bs_perc.index.shape[0],len(perc_colnames)))
-         a.fill(np.nan)    
-         bs_perc=bs_perc.join(pd.DataFrame(np.array(a), 
-                                       index=bs_perc.index, columns=pd.MultiIndex.from_product([['SFR_Q'],perc_colnames])))
-      bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs['SFR_SB']]), 
-                                       index=bs_perc.index, columns=pd.MultiIndex.from_product([['SFR_SB'],perc_colnames])))
-      bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs['luminosity']]), 
-                                       index=bs_perc.index, columns=pd.MultiIndex.from_product([['luminosity'],perc_colnames])))
-      bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row['luminosity']/row['SFR'],[0.05,0.1585,0.5,0.8415,0.95]) 
-                                                   for i,row in gals_bs.iterrows()]), 
-                                       index=bs_perc.index, columns=pd.MultiIndex.from_product([['lx_SFR'],perc_colnames])))
+	      # create dataframe with percentiles of the bootstrapped distribution
+         mstar_tmp=grouped_linear['stellar_mass'].quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+         idx=mstar_tmp.columns.to_frame()
+         idx.insert(0, '', mstar_str)
+         mstar_tmp.columns = pd.MultiIndex.from_frame(idx)
+         mstar_tmp.index.rename('mass_range',inplace=True)
+         if bs_perc.empty:
+            bs_perc=mstar_tmp.copy()
+         else:
+            bs_perc=bs_perc.copy().join(mstar_tmp)
+         perc_colnames=mstar_tmp.columns.get_level_values(1)
 
-      # same for SB
-      #bs_perc=ggals_lin['stellar_mass']
-      #old_idx = bs_perc.columns.to_frame()
-      #perc_colnames=bs_perc.columns
-      #old_idx.insert(0, '', 'stellar_mass')
-      #bs_perc.columns = pd.MultiIndex.from_frame(old_idx)
+         if (z == 2.7) and (key=='Q'):
+            a=np.empty((bs_perc.index.shape[0],len(perc_colnames)))
+            a.fill(np.nan)    
+            bs_perc=bs_perc.join(pd.DataFrame(np.array(a), 
+                                 index=bs_perc.index, columns=pd.MultiIndex.from_product([[sfr_str],perc_colnames])))
+         else:
+            bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs[sfr_str]]), 
+                                                index=bs_perc.index, columns=pd.MultiIndex.from_product([[sfr_str],perc_colnames])))
+                                                
+         bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs[lum_str]]), 
+                                          index=bs_perc.index, columns=pd.MultiIndex.from_product([[lum_str],perc_colnames])))
+	      #bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row['luminosity']/row['SFR'],[0.05,0.1585,0.5,0.8415,0.95]) 
+	      #                                             for i,row in gals_bs.iterrows()]), 
+	      #                                 index=bs_perc.index, columns=pd.MultiIndex.from_product([['lx_SFR'],perc_colnames])))
+         edd_tmp=grouped_linear.edd_ratio.apply(lambda s: pd.DataFrame({
+                                                   (lambda_str,"mean"): [np.mean(s)],
+                                                   (lambda_str,"median"): [np.median(s)],
+                                                   }))
+
+         edd_tmp=edd_tmp.droplevel(1)
+         bs_perc=bs_perc.join(edd_tmp)
 
       # save dataframe to file and add to dictionary for use
       if methods['edd_ratio']=="Schechter":
