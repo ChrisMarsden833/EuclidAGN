@@ -106,5 +106,5 @@ elif methods['BH_mass_method']=="Sahu19":
     M_inf=10.
     M_sup=12.15
 elif methods['BH_mass_method']=="Reines&Volonteri15":
-    M_inf=10.
+    M_inf=9.
 print(M_inf,M_sup)

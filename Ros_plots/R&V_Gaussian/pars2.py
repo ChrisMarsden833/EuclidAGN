@@ -106,10 +106,13 @@ def get_pars():
       M_inf=10.
       M_sup=12.15
    elif methods['BH_mass_method']=="Reines&Volonteri15":
-      M_inf=10.
+      M_inf=9.
    print(M_inf,M_sup)
    
    if methods['edd_ratio']=='Gaussian':
       lambda_z=sigma_z
       alpha_z=mu_z
-   return  z, methods, M_inf, M_sup,alpha_z,lambda_z,variable_name,par_str,parameters
+      
+   slope=None
+
+   return  z, methods, M_inf, M_sup,alpha_z,lambda_z,variable_name,par_str,parameters,slope

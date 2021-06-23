@@ -1,4 +1,4 @@
-# set pars for z=1, same schechter as standard, scaling relation of Davis but change the slope and extend mass range
+# set pars for z=1, same schechter as standard, scaling relation of Reines&Volonteri15 but change the slope and extend mass range
 
 import numpy as np
 
@@ -9,7 +9,7 @@ reds_dic={0.45:0, 1:1, 1.7:2, 2.7:3}
 index=reds_dic.get(z) # needed for IDL data
 
 methods={'halo_to_stars':'Grylls19', # 'Grylls19' or 'Moster'
-    'BH_mass_method':"Davis18", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
+    'BH_mass_method':"Reines&Volonteri15", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
     'BH_mass_scatter':"Intrinsic", # "Intrinsic" or float
     'duty_cycle':"Schulze", # "Schulze", "Man16", "Geo" or float (0.18)
     'edd_ratio':"Schechter", # "Schechter", "PowerLaw", "Gaussian", "Geo"
@@ -39,8 +39,8 @@ lambda_pol=np.poly1d(lambda_pars)
 alpha_z=alpha_pol(z)
 lambda_z=lambda_pol(z)
 
-alpha_z=0.15
-lambda_z=0.1
+alpha_z=0.1
+lambda_z=-0.8
 
 ################################
 # mass range restrictions

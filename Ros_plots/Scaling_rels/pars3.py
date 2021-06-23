@@ -9,7 +9,7 @@ reds_dic={0.45:0, 1:1, 1.7:2, 2.7:3}
 index=reds_dic.get(z) # needed for IDL data
 
 methods={'halo_to_stars':'Grylls19', # 'Grylls19' or 'Moster'
-    'BH_mass_method':"Reines&Volonteri15", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
+    'BH_mass_method':"Shankar16", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
     'BH_mass_scatter':"Intrinsic", # "Intrinsic" or float
     'duty_cycle':"Schulze", # "Schulze", "Man16", "Geo" or float (0.18)
     'edd_ratio':"Schechter", # "Schechter", "PowerLaw", "Gaussian", "Geo"
@@ -37,15 +37,27 @@ lambda_pol=np.poly1d(lambda_pars)
 alpha_z=alpha_pol(z)
 lambda_z=lambda_pol(z)
 
-alpha_z=0.15
-lambda_z=0.1
+alpha_z=0.1
+lambda_z=-0.8
 
 
 ################################
 # mass range restrictions
 M_inf=0
 M_sup=0
+if z==2.7:
+    M_inf=10.
+elif methods['BH_mass_method']=="Shankar16":
+    M_inf=10
+elif methods['BH_mass_method']=="Davis18":
+    M_inf=10.3
+    M_sup=11.4
+elif methods['BH_mass_method']=="Sahu19":
+    M_inf=10.
+    M_sup=12.15
+elif methods['BH_mass_method']=="Reines&Volonteri15":
+    M_inf=9.
 
 ################################
 # filename suffix
-suffix='Reines&Volonteri15'
+suffix='Shankar16'

@@ -1,4 +1,4 @@
-# set pars for z=1, Standard config, testing duty cycle: Georgakakis+17
+# set pars for z=1, Reines&Volonteri15, testing duty cycle: Georgakakis+17
 
 import numpy as np
 
@@ -9,7 +9,7 @@ reds_dic={0.45:0, 1:1, 1.7:2, 2.7:3}
 index=reds_dic.get(z) # needed for IDL data
 
 methods={'halo_to_stars':'Grylls19', # 'Grylls19' or 'Moster'
-    'BH_mass_method':"Shankar16", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
+    'BH_mass_method':"Reines&Volonteri15", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
     'BH_mass_scatter':"Intrinsic", # "Intrinsic" or float
     'duty_cycle':"Geo", # "Schulze", "Man16", "Geo" or float (0.2)
     'edd_ratio':"Schechter", # "Schechter", "PowerLaw", "Gaussian", "Geo"
@@ -80,8 +80,8 @@ if methods['edd_ratio']=='Gaussian':
 #if methods['BH_mass_method']=="Davis18":
 #    slope=1.
 
-alpha_z=0.15
-lambda_z=0.1
+alpha_z=0.1
+lambda_z=-0.8
 
 if methods['edd_ratio']=="Schechter":
    print(f'lambda_z={lambda_z}, alpha_z={alpha_z}')
@@ -104,7 +104,7 @@ elif methods['BH_mass_method']=="Sahu19":
     M_inf=10.
     M_sup=12.15
 elif methods['BH_mass_method']=="Reines&Volonteri15":
-    M_inf=10.
+    M_inf=9.
 print(M_inf,M_sup)
 
 ################################

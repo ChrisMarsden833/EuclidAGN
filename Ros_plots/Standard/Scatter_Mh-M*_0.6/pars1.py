@@ -1,4 +1,4 @@
-# set pars for z=1, Shankar, Schechter lambda=-0.8, alpha=1.6
+# set pars for z=1, Shankar, Schechter alpha_z=0.15, lambda_z=0.1
 
 import numpy as np
 
@@ -37,6 +37,9 @@ if methods['edd_ratio']=='Schechter' and (methods['duty_cycle']=="Schulze" or me
 
     alpha_z=alpha_pol(z)
     lambda_z=lambda_pol(z)
+
+    alpha_z=0.15
+    lambda_z=0.1
 
 
 ################################
