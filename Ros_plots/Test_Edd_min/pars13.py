@@ -1,18 +1,18 @@
-# set pars for z=0.45, sahu, log gaussian varying mean with sigma=0.3dex
+# set pars for z=1, Standard config, testing duty cycle: Man cycle, lambda_min=-5
 
 import numpy as np
 
 ################################
 # set simulation parameters
-z = 0.45
+z = 1.0
 reds_dic={0.45:0, 1:1, 1.7:2, 2.7:3}
 index=reds_dic.get(z) # needed for IDL data
 
 methods={'halo_to_stars':'Grylls19', # 'Grylls19' or 'Moster'
-    'BH_mass_method':"Sahu19", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
+    'BH_mass_method':"Reines&Volonteri15", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
     'BH_mass_scatter':"Intrinsic", # "Intrinsic" or float
-    'duty_cycle':"Schulze", # "Schulze", "Man16", "Geo" or float (0.18)
-    'edd_ratio':"Gaussian", # "Schechter", "PowerLaw", "Gaussian", "Geo"
+    'duty_cycle':"Man16", # "Schulze", "Man16", "Geo" or float (0.2)
+    'edd_ratio':"Schechter", # "Schechter", "PowerLaw", "Gaussian", "Geo"
     'bol_corr':'Lusso12_modif', # 'Duras20', 'Marconi04', 'Lusso12_modif'
     'SFR':'Carraro20' # 'Tomczak16', "Schreiber15", "Carraro20"
     }
@@ -28,11 +28,11 @@ elif methods['edd_ratio']=="Gaussian":
    #par_str= 'sigma'
    variable_name = r"$\mu$"
    par_str= 'mean'
-parameters = [-3.9,-3.5,-3.0,-2.5]
+parameters = [-1.0,-0.5,0.,0.5,1.0]
 
 ################################
 # Edd ratio parameters definition:
-if methods['edd_ratio']=='Schechter' and (methods['duty_cycle']=="Schulze" or methods['duty_cycle']=="Geo") and (methods['BH_mass_method']=="Shankar16" or methods['BH_mass_method']=="Davis18" or methods['BH_mass_method']=="Sahu19" or methods['BH_mass_method']=="Reines&Volonteri15"):
+if methods['edd_ratio']=='Schechter' and (methods['BH_mass_method']=="Shankar16" or methods['BH_mass_method']=="Davis18" or methods['BH_mass_method']=="Sahu19" or methods['BH_mass_method']=="Reines&Volonteri15"):
     #fitting:
     #redshift = [0.1, 1, 2]
     #alpha = [-0.25,1.6,7.14]
@@ -51,11 +51,7 @@ if methods['edd_ratio']=='Schechter' and (methods['duty_cycle']=="Schulze" or me
     alpha_z=alpha_pol(z)
     lambda_z=lambda_pol(z)
 
-    alpha_z=-0.5
-    lambda_z=-0.1
-
 if z==1 and methods['edd_ratio']=='Schechter' and (methods['duty_cycle']=="Schulze" or methods['duty_cycle']=="Geo") and (methods['BH_mass_method']=="Reines&Volonteri15"):
-    # parameters found by testing, see folder 42_TestSchechter_R&V
     alpha_z=-1.5
     lambda_z=1
 
@@ -73,13 +69,16 @@ if methods['edd_ratio']=='Schechter' and methods['duty_cycle']=="Schulze" and me
     alpha_z = 0
 
 # Schechter P(lambda), z=1, duty cycle costante e uguale a 0.18 usando la relazione Mstar-Mbh di Shankar + 16:
-if z==1 and methods['edd_ratio']=='Schechter' and methods['duty_cycle']==0.18 and methods['BH_mass_method']=="Shankar16":
+if z==1 and methods['edd_ratio']=='Schechter' and methods['duty_cycle']==0.2 and methods['BH_mass_method']=="Shankar16":
     lambda_z = -1
     alpha_z = 1.2
 
 if methods['edd_ratio']=='Gaussian':
     sigma_z = 0.3 # sigma
     mu_z = 0.25 # mean edd
+
+alpha_z=0.1
+lambda_z=-0.8
 
 #if methods['BH_mass_method']=="Davis18":
 #    slope=1.
@@ -105,5 +104,10 @@ elif methods['BH_mass_method']=="Sahu19":
     M_inf=10.
     M_sup=12.15
 elif methods['BH_mass_method']=="Reines&Volonteri15":
-    M_inf=10.
+    M_inf=9.
 print(M_inf,M_sup)
+
+################################
+# filename suffix
+suffix='_Man19_lambdam-5'
+lambda_min=-5

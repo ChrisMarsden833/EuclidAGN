@@ -1,4 +1,4 @@
-# set pars for z=1, Shankar, Marconi bol_corr, Schechter changing lambda, alpha=1.1
+# set pars for z=1, Reines&Volonteri15 with log gaussian, varying sigma with mean=-1.5
 
 import numpy as np
 
@@ -10,11 +10,11 @@ def get_pars():
    index=reds_dic.get(z) # needed for IDL data
 
    methods={'halo_to_stars':'Grylls19', # 'Grylls19' or 'Moster'
-      'BH_mass_method':"Shankar16", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
+      'BH_mass_method':"Reines&Volonteri15", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
       'BH_mass_scatter':"Intrinsic", # "Intrinsic" or float
       'duty_cycle':"Schulze", # "Schulze", "Man16", "Geo" or float (0.18)
-      'edd_ratio':"Schechter", # "Schechter", "PowerLaw", "Gaussian", "Geo"
-      'bol_corr':'Marconi04', # 'Duras20', 'Marconi04', 'Lusso12_modif'
+      'edd_ratio':"Gaussian", # "Schechter", "PowerLaw", "Gaussian", "Geo"
+      'bol_corr':'Lusso12_modif', # 'Duras20', 'Marconi04', 'Lusso12_modif'
       'SFR':'Carraro20' # 'Tomczak16', "Schreiber15", "Carraro20"
       }
 
@@ -25,11 +25,11 @@ def get_pars():
       #variable_name = r"$\alpha$"
       #par_str= 'alpha'
    elif methods['edd_ratio']=="Gaussian":
-      #variable_name = r"$\sigma$"
-      #par_str= 'sigma'
-      variable_name = r"$\mu$"
-      par_str= 'mean'
-   parameters = [-1.0,-0.5,0.,0.1,0.2,0.3,0.4,0.5,1.0]
+      variable_name = r"$\sigma$"
+      par_str= 'sigma'
+      #variable_name = r"$\mu$"
+      #par_str= 'mean'
+   parameters = [0.1,0.3,0.5,0.7,1.0,2.0,3.0]
 
    ################################
    # Edd ratio parameters definition:
@@ -52,14 +52,21 @@ def get_pars():
       alpha_z=alpha_pol(z)
       lambda_z=lambda_pol(z)
 
-      alpha_z=1.1
-      lambda_z=0.1
+   if methods['edd_ratio']=='Gaussian':
+      sigma_z = 0.3 # sigma
+      mu_z = -1.5 # mean edd
+
+   if methods['edd_ratio']=="Schechter":
+      print(f'lambda_z={lambda_z}, alpha_z={alpha_z}')
+   elif methods['edd_ratio']=="Gaussian":
+      print(f'sigma={sigma_z}, mu_z={mu_z}')
 
 
    ################################
    # mass range restrictions
    M_inf=0
    M_sup=0
+   """
    if z==2.7:
       M_inf=10.
    elif methods['BH_mass_method']=="Shankar16":
@@ -72,5 +79,13 @@ def get_pars():
       M_sup=12.15
    elif methods['BH_mass_method']=="Reines&Volonteri15":
       M_inf=10.
+   print(M_inf,M_sup)
+   """
+
+   if methods['edd_ratio']=='Gaussian':
+      lambda_z=sigma_z
+      alpha_z=mu_z
       
-   return  z, methods, M_inf, M_sup,alpha_z,lambda_z,variable_name,par_str,parameters
+   slope=None
+
+   return  z, methods, M_inf, M_sup,alpha_z,lambda_z,variable_name,par_str,parameters,slope
