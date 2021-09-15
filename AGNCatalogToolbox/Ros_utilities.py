@@ -2,6 +2,7 @@
 import numpy as np
 import weightedstats as ws
 from numpy.core.numeric import NaN
+import pandas as pd
 
 def append_new_line(file_name, text_to_append):
     """Append given text as a new line at the end of file"""
@@ -19,9 +20,20 @@ def append_new_line(file_name, text_to_append):
 def is_active(duty_cycle):
    tosses=np.random.uniform(size=len(duty_cycle))
    result=np.full_like(duty_cycle, 0.)
-   result[tosses < duty_cycle] = 1.
-   print(tosses[:5])
+   result[tosses <= duty_cycle] = 1.
    return result
+
+def sf_type(size=50,i=0,mbin=0):
+   npzfile = np.load('./IDL_data/type_fractions.npz')
+   frac_SF=npzfile['frac_SF']
+   frac_Q=npzfile['frac_Q']
+   frac_SB=npzfile['frac_SB']
+   types_list=['SF', 'Q', 'SB']
+   data = np.random.choice(  
+        a=types_list,  
+        size=size,  
+        p=[frac_SF[i,mbin], frac_Q[i,mbin], frac_SB[i,mbin]])
+   return data
 
 def weighted_quantile(values, sample_weight=None, quantiles=0.5, 
                       values_sorted=False):
@@ -54,7 +66,7 @@ def weighted_quantile(values, sample_weight=None, quantiles=0.5,
    weighted_quantiles /= np.sum(sample_weight)
    return np.interp(quantiles, weighted_quantiles, values)
 
-def my_draw_bs_reps(data,weights, size=1,type='median'):
+def my_draw_bs_reps(data,weights=None, size=1,type='median'):
    """
    Generate bootstrap replicates out of `data` using `weightedstats.weighted_median` and `weights`.
 
@@ -83,15 +95,23 @@ def my_draw_bs_reps(data,weights, size=1,type='median'):
    if n == 0:
       bs_reps[:]=np.nan
       return bs_reps
+   if weights is None:
+      weights=np.ones_like(data)
 
    # Draw replicates
-   print(f'Data points: {n}')
+   #print(f'Data points: {n}')
    for i in range(size):
       idx=np.random.choice(np.arange(n,dtype='int'),size=n)
          #bs_reps[i] = weighted_quantile(data[idx], weights[idx])
       if type=='median':
-         data_list=data[idx].tolist()
-         weights_list=weights[idx].tolist()
+         if isinstance(data,(pd.Series,pd.DataFrame)):
+            data_list=data.iloc[idx].tolist()
+         else:
+            data_list=data[idx].tolist()
+         if isinstance(weights,(pd.Series,pd.DataFrame)):
+            weights_list=weights.iloc[idx].tolist()
+         else:
+            weights_list=weights[idx].tolist()
          bs_reps[i] = ws.weighted_median(data_list, weights=weights_list)
       elif type=='mean':
          bs_reps[i] = np.average(data[idx], weights=weights[idx])
