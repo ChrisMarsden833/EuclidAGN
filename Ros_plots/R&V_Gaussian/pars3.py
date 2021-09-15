@@ -29,7 +29,7 @@ def get_pars():
       #par_str= 'sigma'
       variable_name = r"$\mu$"
       par_str= 'mean'
-   parameters = [-4.,-3.5,-3.0,-2.5,-2.0,-1.5,-1.0,-0.5]
+   parameters = [-4.,-3.5,-3.0,-2.5,-2.0,-1.95,-1.9,-1.85,-1.8-1.75,-1.70,-1.65,-1.6,-1.55,-1.5,-1.0,-0.5]
 
    ################################
    # Edd ratio parameters definition:
