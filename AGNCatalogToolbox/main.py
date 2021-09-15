@@ -261,24 +261,32 @@ def stellar_mass_to_black_hole_mass(stellar_mass, method="Shankar16", scatter="I
     elif method == "Davis18":
        # Davis+18, eq. 3
        log_black_hole_mass = 7.25 + 3.05 * (stellar_mass - 10.8) # original equation
-       log_black_hole_mass += np.random.normal(0., 1.6, len(stellar_mass))
     elif method == "Sahu19":
        # Sahu+19, Eq. 11, fig. 11 
        log_black_hole_mass = 8.02 + 1.65 * (stellar_mass - 10.7)
-       log_black_hole_mass += np.random.normal(0., 1.2, len(stellar_mass))   
     elif method == "Reines&Volonteri15":
        # Eq. 4,5 and Fig 8 
        # log_black_hole_mass = 7.45 + 1.05 * (stellar_mass - 11.) # original equation
        log_black_hole_mass = norm + slope * (stellar_mass - 11.)
-       log_black_hole_mass += np.random.normal(0., 1.1, len(stellar_mass))
+    else:
+        raise ValueError("Unknown method {}".format(scatter))
 
     # Scatter
     if scatter == "Intrinsic" or scatter == "intrinsic":
         if method == "Shankar16":
             # The intrinsic formula for scatter given in FS's relation
             scatter = (0.32 - 0.1 * (stellar_mass - 12.)) * np.random.normal(0., 1., len(stellar_mass))
+        elif method == "Reines&Volonteri15":
+            print('Scatter R&V')
+            scatter = np.random.normal(0, 0.55, len(stellar_mass)) # rms deviation, pag8
+        elif method == "Sahu19":
+            print('Scatter Sahu19')
+            scatter = np.random.normal(0, 0.58, len(stellar_mass)) # delta_rms, pag13, table 5
+        elif method == "Davis18":
+            print('Scatter Davis18')
+            scatter = np.random.normal(0, 0.79, len(stellar_mass)) #delta_rms, pag9
         else:
-            print('scatter')
+            print('Scatter=0.5')
             scatter = np.random.normal(0, 0.5, len(stellar_mass))
     elif isinstance(type(scatter), float):
         scatter = np.random.normal(0., scatter, len(stellar_mass))
@@ -319,7 +327,7 @@ def to_duty_cycle(method, stellar_mass, black_hole_mass, z=0, data_path="./Data/
             mann_duty_cycle = df[1].values
             get_u = interpolate.interp1d(mann_stellar_mass, mann_duty_cycle, bounds_error=False,
                                             fill_value=(mann_duty_cycle[0], mann_duty_cycle[-1]))
-            duty_cycle = get_u(stellar_mass) #+ np.random.normal(0., 0.1, len(stellar_mass))
+            duty_cycle = get_u(stellar_mass)
             plt.plot(stellar_mass, duty_cycle, '.', label = "Mocks",alpha=0.2)
             plt.plot(mann_stellar_mass, mann_duty_cycle, '-', label = "Model")
             plt.xlabel(r'$M_*\;[M_\odot]$')
@@ -378,23 +386,23 @@ def edd_schechter_function(edd, method="Schechter", arg1=-1, arg2=-0.65, arg3=1,
         prob *= ((1. + z) / (1. + z0)) ** gammaz
 
     if method == "Schechter":
-        #return prob * np.exp(-(edd / (10. ** arg1)))
         def Schechter(x,llambda,alpha):
-           #return ((10**x / (10. ** llambda)) ** alpha)* np.exp(-(10**x / (10. ** llambda)))
-           return 10.**(alpha*(x-llambda))*np.exp(-10.**(x-llambda))
+            return 10.**(-alpha*(x-llambda))*np.exp(-(10.**(x-llambda)))*10.**x*np.log(10.)
 
         norm_fac=quad(Schechter, np.min(edd), np.max(edd), args=(arg1,arg2))
         #norm_fac1=np.sum(Schechter(edd,arg1,arg2)*(edd[1]-edd[0]))
 
+        """
         # plot schechter and cumulative
-        #plt.figure()
+        plt.figure()
         #plt.yscale('log')
-        #plt.plot(edd,Schechter(edd,arg1,arg2),label='Schechter')
-        #plt.plot(edd,Schechter(edd,arg1,arg2)/norm_fac[0],label='Norm Schechter mio')
+        plt.plot(edd,Schechter(edd,arg1,arg2),label='Schechter')
+        plt.plot(edd,Schechter(edd,arg1,arg2)/norm_fac[0],label='Norm Schechter mio')
         #plt.plot(edd,Schechter(edd,arg1,arg2)/norm_fac1,label='Norm Schechter Viola')
-        #plt.plot(edd,np.cumsum(Schechter(edd,arg1,arg2)/norm_fac[0]*(edd[1]-edd[0])),label='Cumulative')
-        #plt.legend()
-        #plt.show()
+        plt.plot(edd,np.cumsum(Schechter(edd,arg1,arg2)/norm_fac[0]*(edd[1]-edd[0])),label='Cumulative')
+        plt.legend()
+        plt.savefig('./Ros_plots/Schechter_distrib.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True)
+        """
 
         return Schechter(edd,arg1,arg2)/norm_fac[0]
     elif method == "PowerLaw":
@@ -449,6 +457,11 @@ def black_hole_mass_to_luminosity(black_hole_mass, z=0, method="Schechter",
     """
     
     l_edd = 38.1072 + black_hole_mass # log(L_Edd) [erg/s]
+    
+    #plt.figure()
+    #plt.hist(l_edd,density=True)
+    #plt.ylabel('Mbh+ Ledd')
+    #plt.show()
 
     binning=0.0001
     edd_bin = np.arange(lambda_min, 1, binning)
@@ -467,19 +480,20 @@ def black_hole_mass_to_luminosity(black_hole_mass, z=0, method="Schechter",
       print(f'ATTENTION!!! Normalization went wrong, cumulative goes up to {y[-1]} instead of 1')
    
     # characteristic lambda
+    lambda_char=np.cumsum(prob_schechter_function*(10**edd_bin)*binning) # Pn(x)*x*dlog(x)  # x=lambda (lin scale)
     if method=="Schechter":
       #lin_bin=np.diff(10**edd_bin, append=0.0023021)#, prepend=2.3025e-08
       #lambda_char=np.cumsum(prob_schechter_function*(10**edd_bin)*lin_bin) # Pn(x)*x*dx  # x=lambda (lin scale)
       #print(f'characteristic lambda (lin) for this eddington distribution: {lambda_char[-1]}')
-      lambda_char=np.cumsum(prob_schechter_function*(10**edd_bin)*binning) # Pn(x)*x*dlog(x)  # x=lambda (lin scale)
-      print(f'characteristic log(lambda) (linear integ.) for alpha={parameter2:2f}, lambda={parameter1:2f}: {np.log10(lambda_char[-1]):.2f}')
-      lambda_char=np.cumsum(prob_schechter_function*edd_bin*binning) # Pn(x)*log(x)*dlog(x)
-      print(f'characteristic log(lambda) for alpha={parameter2:2f}, lambda={parameter1:2f}: {lambda_char[-1]:.2f}')
+      #lambda_char=np.cumsum(prob_schechter_function*(10**edd_bin)*binning) # Pn(x)*x*dlog(x)  # x=lambda (lin scale)
+      print(f'characteristic log(lambda)={np.log10(lambda_char[-1]):.23} for alpha={parameter2:2f}, lambda={parameter1:2f}')
+      #lambda_char=np.cumsum(prob_schechter_function*edd_bin*binning) # Pn(x)*log(x)*dlog(x)
+      #print(f'characteristic log(lambda) for alpha={parameter2:2f}, lambda={parameter1:2f}: {lambda_char[-1]:.2f}')
     else: # Gaussian
-      lambda_char=np.cumsum(prob_schechter_function*(10**edd_bin)*binning) # Pn(x)*log(x)*dlog(x)
-      print(f'characteristic log(lambda) (linear integ.) for mean={parameter2:2f}, sigma={parameter1:2f}: {np.log10(lambda_char[-1]):.2f}')
-      lambda_char=np.cumsum(prob_schechter_function*edd_bin*binning) # Pn(x)*log(x)*dlog(x)
-      print(f'characteristic log(lambda) for mean={parameter2:2f}, sigma={parameter1:2f}: {lambda_char[-1]:.2f}')
+      #lambda_char=np.cumsum(prob_schechter_function*(10**edd_bin)*binning) # Pn(x)*x*dlog(x)
+      print(f'characteristic log(lambda)={np.log10(lambda_char[-1]):.3f} for mean={parameter2:2f}, sigma={parameter1:2f}')
+      #lambda_char=np.cumsum(prob_schechter_function*edd_bin*binning) # Pn(x)*log(x)*dlog(x)
+      #print(f'characteristic log(lambda) for mean={parameter2:2f}, sigma={parameter1:2f}: {lambda_char[-1]:.2f}')
 
     a = np.random.random(len(black_hole_mass))
     y2edd_bin = interpolate.interp1d(y, edd_bin, bounds_error=False, fill_value=(edd_bin[0], edd_bin[-1]))
@@ -488,13 +502,17 @@ def black_hole_mass_to_luminosity(black_hole_mass, z=0, method="Schechter",
     #np.save('l_bol.npy',l_bol)
     #print(f'lum_min={np.min(l_bol)}, lum_max={np.max(l_bol)}')
 
-    #plt.hist(lg_edd)
-    #plt.ylabel('lg_edd')
-    #plt.show()
+    """
+    plt.figure()
+    plt.hist(lg_edd,density=True)
+    plt.ylabel('labda distrib')
+    plt.show()
 
-    #plt.hist(l_bol)
-    #plt.ylabel('l_bol')
-    #plt.show()
+    plt.figure()
+    plt.hist(l_bol,density=True)
+    plt.ylabel('l_bol')
+    plt.show()
+    """
 
     if bol_corr == 'Marconi04':
        #eq 21
@@ -563,12 +581,18 @@ def black_hole_mass_to_luminosity(black_hole_mass, z=0, method="Schechter",
     elif bol_corr == 'Duras20':
        # table1, (Klbol),general
        pars = [10.96, 11.93, 17.79]
-       k_corr = pars[0]*(1+((l_bol - 33.485)/pars[1])**pars[2])
+       k_corr = np.log10(pars[0]*(1+((l_bol - 33.485)/pars[1])**pars[2]))
        luminosity=l_bol-k_corr
     else:
        assert False, "Bolometric correction is unknown"
 
-    return luminosity, lambda_char[-1], lg_edd
+    """
+    plt.figure()
+    plt.hist(luminosity,density=True)
+    plt.ylabel('luminosity (2-10kev)')
+    plt.show()
+    """
+    return luminosity, np.log10(lambda_char[-1]), lg_edd
 
 def weightedFunction(parameter, duty_cycle, bins, volume):
     """ Function to calculate the
