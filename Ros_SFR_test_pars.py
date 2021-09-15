@@ -23,7 +23,7 @@ from importlib import import_module
 import re
 
 def convert_var_file(var_file):
-   print(var_file)
+   #print(var_file)
    vars=open(var_file).read()       
    exec(vars,globals()) 
    return
@@ -53,11 +53,16 @@ def simulation(var_file):
 
    ## default suffix for filenames
    suffix=''
+   weighted_luminosity=True
+   #nh_thresh=24
 
    ################################
    # import simulation parameters
    curr_path=var_file[0:var_file.rfind('pars')]
    sys.path.append(curr_path)
+   # find all '/' substrings
+   res = [i for i in range(len(curr_path)) if curr_path.startswith('/', i)]
+   working_dir=curr_path[res[-2]+1:]
 
    #from pars4 import *
    #var_files = sorted(glob.glob(curr_dir+'/Ros_plots/'+sub_dir+'pars*'))
@@ -82,6 +87,9 @@ def simulation(var_file):
    if methods['edd_ratio']=='Gaussian':
       sigma_z=lambda_z
       mu_z=alpha_z
+
+   Lx_lim_dic={0.45:1e42, 1:6e42, 1.7:2e43, 2.7:4e43}
+   Lx_lim=Lx_lim_dic.get(z) # needed for IDL data
 
    ################################
    ## Generate universe ##
@@ -183,7 +191,7 @@ def simulation(var_file):
       elif methods['edd_ratio']=="Gaussian":
          append_new_line(curr_path+'Squared_test.txt', f'z={z}, mean={alpha_z:.2f}, sigma={lambda_z:.2f}:\tlog(lambda_char)={lambda_char:.3f}')#, Squares sum={S:.2e}
 
-      #gals_tmp['nh'] = agn.luminosity_to_nh(gals_tmp.luminosity, z)
+      #gals_tmp['nh'] = agn.luminosity_to_nh(gals_tmp.luminosity, z,parallel=False)
       #gals_tmp['agn_type'] = agn.nh_to_type(gals_tmp.nh)
 
       gals_tmp['SFR'] = agn.SFR(z,gals_tmp.stellar_mass,methods['SFR'])
@@ -200,6 +208,7 @@ def simulation(var_file):
       # converting to linear units
       gals_lin=pd.DataFrame()
       gals_lin['stellar_mass'] = gals_tmp['stellar_mass'] # stays log
+      #gals_lin['nh'] = gals_tmp['nh'] # stays log
       gals_lin['duty_cycle'] = gals_tmp['duty_cycle'] # no need to convert
       gals_lin['luminosity']= 10**(gals_tmp.luminosity-42)
       gals_lin[['SFR','lx/SFR']]=10**gals_tmp[['SFR','lx/SFR']]
@@ -209,104 +218,160 @@ def simulation(var_file):
       gals_lin['edd_ratio']=gals_tmp['edd_ratio']
 
       dfs_dict=dict(SF='',Q='_Q',SB='_SB')
-      bs_perc=pd.DataFrame()
 
-      for key, str in dfs_dict.items():
-         sfr_str='SFR'+str
-         mstar_str='stellar_mass'+str
-         lum_str='luminosity'+str
-         lambda_str='lambda_ave'+str
+      cases={'all':'_all','active':'_active'}
+      for case in cases:
+         bs_perc=pd.DataFrame()
+         for key, str in dfs_dict.items():
+            sfr_str='SFR'+str
+            mstar_str='stellar_mass'+str
+            lum_str='luminosity'+str
+            lambda_str='lambda_ave'+str
 
-	      # remove galaxies with lx < lx_binaries, as of Lehmer+16, from both dfs
-         gals_lin['lx_bin']=10**(29.37+2.03*np.log10(1+z)+gals_lin.stellar_mass-42)+10**(39.28+1.31*np.log10(1+z)+gals_tmp[sfr_str]-42)
-	      #α0(1 + z)γ M∗ + β0(1 + z)δSFR, (3)
-	      #with logα0 = 29.37, logβ0 = 39.28, γ = 2.03, and δ = 1.31.
-         to_drop=gals_lin['luminosity']<=gals_lin['lx_bin']
-         print(f'Fraction galaxies with LX<LX_bin: {to_drop.sum()/(gals_lin.shape[0]):.3f}')
-		      
-         gals_lin_tmp=gals_lin.copy()[gals_lin['luminosity']>gals_lin['lx_bin']]
-         gals_lin_tmp=gals_lin_tmp[gals_lin_tmp['stellar_mass']>9]
+            gals_lin_tmp=gals_lin.copy()
+            # remove galaxies with lx < lx_binaries, as of Lehmer+16, from both dfs
+            #gals_lin['lx_bin']=10**(29.37+2.03*np.log10(1+z)+gals_lin.stellar_mass-42)+10**(39.28+1.31*np.log10(1+z)+gals_tmp[sfr_str]-42)
+            gals_lin_tmp['lx_bin']=10**(np.log10((((10.**29.37)*((1.+z)**2.03))/10.**42.)*(10.**gals_lin.stellar_mass)+(((10.**39.28)*((1.+z)**1.31)*(10**gals_tmp[sfr_str]))/10.**42.)) + np.random.normal(0., 0.17, gals_lin.shape[0]))
+            #α0(1 + z)γ M∗ + β0(1 + z)δSFR, (3)
+            #with logα0 = 29.37, logβ0 = 39.28, γ = 2.03, and δ = 1.31.
+   #         to_drop=gals_lin['luminosity']<=gals_lin['lx_bin']
+   #         print(f'Fraction galaxies with LX<LX_bin: {to_drop.sum()/(gals_lin.shape[0]):.3f}')
+               
+            #gals_lin_tmp=gals_lin.copy()[gals_lin['luminosity']>gals_lin['lx_bin']]
+            #gals_lin_tmp=gals_lin_tmp[gals_lin_tmp['stellar_mass']>9]
 
-         ################################
-         ## Bootstrapping ##
-         ################################
-         M_min=np.max([9,M_inf])
-         #print('bootstrapping ')
+            # add individual XRB contribution to luminosity
+            gals_lin_tmp['luminosity']=gals_lin_tmp['luminosity']+gals_lin_tmp['lx_bin']
+   #         flag = gals_lin_tmp['luminosity']>gals_lin_tmp['lx_bin']
+   #         gals_lin_tmp=gals_lin_tmp[flag]
+            M_min=np.max([9,M_inf]) 
+            gals_lin_tmp=gals_lin_tmp[gals_lin_tmp['stellar_mass']>M_min]
+      
+            # count galaxies
+            galaxy_count=gals_lin_tmp[['stellar_mass']].groupby(pd.cut(gals_lin_tmp.stellar_mass, np.append(np.arange(np.floor(M_min*2)/2, 11.5, 0.5),12.5))).count()
+            galaxy_count.rename(columns={'stellar_mass':'galaxy_count'},inplace=True)
+            #print(galaxy_count)
 
-         # create dataframe for bootstrapping
-         gals_highM=gals_lin_tmp.copy()[gals_lin_tmp.stellar_mass > M_min]
-         grouped_linear = gals_highM[['stellar_mass','black_hole_mass','luminosity','SFR','SFR_Q','SFR_SB','lx/SFR','duty_cycle','edd_ratio']].groupby(pd.cut(gals_highM.stellar_mass, np.append(np.arange(M_min, 11.5, 0.5),12.)))#.quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
-         # sb mass bins [[9.5,10.25],[10.25,10.75],[10.75,11.5]]
-         print(f'Statistics for mock sample mean={alpha_z} sigma={lambda_z}:')
-         print(gals_highM[['stellar_mass','black_hole_mass','duty_cycle']].describe(percentiles=[.01,.05,.25, .5, .75,.95,.99]))
-         
-         """
-         # plot masses
-         stellar_mass=np.linspace(gals_highM['stellar_mass'].min(),gals_highM['stellar_mass'].max())
-         plt.figure()
-         plt.scatter(gals_highM['stellar_mass'],gals_highM['black_hole_mass'],label='Mock galaxies',alpha=0.2,s=0.2)
-         plt.plot(stellar_mass,7.574 + 1.946 * (stellar_mass - 11.) - 0.306 * (stellar_mass - 11.)**2.- 0.011 * (stellar_mass - 11.)**3,label='Shankar+16',c='Orange')
-         plt.ylabel('black_hole_mass')
-         plt.xlabel('stellar_mass')
-         #plt.xlim(10,gals_highM['stellar_mass'].max())
-         #plt.ylim(3.4,gals_highM['black_hole_mass'].max()+0.2)
-         plt.legend()
-         file_name=curr_path+f'masses_rel_mean{alpha_z}_sigma{lambda_z}'+suffix+'.pdf'
-         plt.savefig(file_name, format = 'pdf', bbox_inches = 'tight',transparent=True)
-         """
+            if case =='active':
+               gals_lin_tmp=gals_lin_tmp[gals_lin_tmp['luminosity']>Lx_lim/1e42]
+            #gals_lin_tmp=gals_lin_tmp[gals_lin_tmp['nh']<nh_thresh]
+            ################################
+            ## Bootstrapping ##
+            ################################
+            M_min=np.max([9,M_inf])
+            #print('bootstrapping ')
 
-         # create dataframe of bootstraped linear varibles
-         gals_bs=pd.DataFrame()
-         
-         func=np.median
-         if not ((z == 2.7) and (key=='Q')):
-            gals_bs[sfr_str] = grouped_linear[sfr_str].apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
+            # create dataframe for bootstrapping
+            gals_highM=gals_lin_tmp.copy()#[gals_lin_tmp.stellar_mass > M_min]
+            grouped_linear = gals_highM[['stellar_mass','black_hole_mass','luminosity','SFR','SFR_Q','SFR_SB','lx/SFR','duty_cycle','edd_ratio']].groupby(pd.cut(gals_highM.stellar_mass, np.append(np.arange(M_min, 11.5, 0.5),12.5)))#.quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+            # sb mass bins [[9.5,10.25],[10.25,10.75],[10.75,11.5]]
+            #print(f'Statistics for mock sample mean={alpha_z} sigma={lambda_z}:')
+            #print(gals_highM[['stellar_mass','black_hole_mass','duty_cycle']].describe(percentiles=[.01,.05,.25, .5, .75,.95,.99]))
             
-         #gals_bs[lum_str] = grouped_linear.apply(lambda x: my_draw_bs_reps(x.luminosity.values,x.duty_cycle.values, size=500))
-         gals_bs[lum_str] = grouped_linear.apply(lambda x: my_draw_bs_reps(x.luminosity.values,x.duty_cycle.values, size=500,type='mean'))
-         gals_bs.head()
+            #print('----------')
+            AGN_count=grouped_linear.stellar_mass.count()
+            AGN_count.rename('AGN_count',inplace=True)
+            #print(AGN_count)
+            #print('----------')
+            AGN_fraction=AGN_count/galaxy_count.galaxy_count
+            AGN_fraction=AGN_fraction.rename('AGN_fraction').to_frame()
+            AGN_fraction.columns = pd.MultiIndex.from_product([AGN_fraction.columns, ['']])
+            #if case=='active':
+            #   print(AGN_fraction)
+            
+            """
+            # plot masses
+            stellar_mass=np.linspace(gals_highM['stellar_mass'].min(),gals_highM['stellar_mass'].max())
+            plt.figure()
+            plt.scatter(gals_highM['stellar_mass'],gals_highM['black_hole_mass'],label='Mock galaxies',alpha=0.2,s=0.2)
+            plt.plot(stellar_mass,7.574 + 1.946 * (stellar_mass - 11.) - 0.306 * (stellar_mass - 11.)**2.- 0.011 * (stellar_mass - 11.)**3,label='Shankar+16',c='Orange')
+            plt.ylabel('black_hole_mass')
+            plt.xlabel('stellar_mass')
+            #plt.xlim(10,gals_highM['stellar_mass'].max())
+            #plt.ylim(3.4,gals_highM['black_hole_mass'].max()+0.2)
+            plt.legend()
+            file_name=curr_path+f'masses_rel_mean{alpha_z}_sigma{lambda_z}'+suffix+'.pdf'
+            plt.savefig(file_name, format = 'pdf', bbox_inches = 'tight',transparent=True)
+            """
 
-	      # create dataframe with percentiles of the bootstrapped distribution
-         mstar_tmp=grouped_linear['stellar_mass'].quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
-         idx=mstar_tmp.columns.to_frame()
-         idx.insert(0, '', mstar_str)
-         mstar_tmp.columns = pd.MultiIndex.from_frame(idx)
-         mstar_tmp.index.rename('mass_range',inplace=True)
-         if bs_perc.empty:
-            bs_perc=mstar_tmp.copy()
-         else:
-            bs_perc=bs_perc.copy().join(mstar_tmp)
-         perc_colnames=mstar_tmp.columns.get_level_values(1)
+            # create dataframe of bootstraped linear varibles
+            gals_bs=pd.DataFrame()
+            
+            #func=np.median
+            func='median'
+            if not ((z == 2.7) and (key=='Q')):
+               #gals_bs[sfr_str] = grouped_linear[sfr_str].apply(lambda x: dcst.draw_bs_reps(x, func, size=500))
+               gals_bs[sfr_str] = grouped_linear.apply(lambda x: my_draw_bs_reps(x[sfr_str], type=func, size=500))
+               
+            #gals_bs[lum_str] = grouped_linear.apply(lambda x: my_draw_bs_reps(x.luminosity.values,x.duty_cycle.values, size=500))
+            #gals_bs[lum_str] = grouped_linear.apply(lambda x: np.average(x.luminosity.values*x.duty_cycle.values))
+            if case == 'all':
+               if weighted_luminosity:
+                  print('Multiplying by duty cycle in simple mean')
+                  gals_bs[lum_str] = grouped_linear.apply(lambda x: my_draw_bs_reps(x.luminosity.values*x.duty_cycle.values, size=500,type='mean'))
+               else:
+                  print('NOT using duty cycle in (simple) mean')
+                  gals_bs[lum_str] = grouped_linear.apply(lambda x: my_draw_bs_reps(x.luminosity.values, size=500,type='mean'))
+            else: # 'active'
+               if weighted_luminosity:
+                  print('Using duty cycle in mean')
+                  gals_bs[lum_str] = grouped_linear.apply(lambda x: my_draw_bs_reps(x.luminosity.values,x.duty_cycle.values, size=500,type='mean'))
+               else:
+                  print('NOT using duty cycle in mean')
+                  gals_bs[lum_str] = grouped_linear.apply(lambda x: my_draw_bs_reps(x.luminosity.values, size=500,type='mean'))
+            #gals_bs[lum_str] = grouped_linear.apply(lambda x: my_draw_bs_reps(x.luminosity.values,x.duty_cycle.values, size=500,type='mean'))
+            #gals_bs.head()
 
-         if (z == 2.7) and (key=='Q'):
-            a=np.empty((bs_perc.index.shape[0],len(perc_colnames)))
-            a.fill(np.nan)    
-            bs_perc=bs_perc.join(pd.DataFrame(np.array(a), 
-                                 index=bs_perc.index, columns=pd.MultiIndex.from_product([[sfr_str],perc_colnames])))
-         else:
-            bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs[sfr_str]]), 
-                                                index=bs_perc.index, columns=pd.MultiIndex.from_product([[sfr_str],perc_colnames])))
-                                                
-         bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs[lum_str]]), 
-                                          index=bs_perc.index, columns=pd.MultiIndex.from_product([[lum_str],perc_colnames])))
-	      #bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row['luminosity']/row['SFR'],[0.05,0.1585,0.5,0.8415,0.95]) 
-	      #                                             for i,row in gals_bs.iterrows()]), 
-	      #                                 index=bs_perc.index, columns=pd.MultiIndex.from_product([['lx_SFR'],perc_colnames])))
-         edd_tmp=grouped_linear.edd_ratio.apply(lambda s: pd.DataFrame({
-                                                   (lambda_str,"mean"): [np.mean(s)],
-                                                   (lambda_str,"median"): [np.median(s)],
-                                                   }))
+            # create dataframe with percentiles of the bootstrapped distribution
+            mstar_tmp=grouped_linear['stellar_mass'].quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+            idx=mstar_tmp.columns.to_frame()
+            idx.insert(0, '', mstar_str)
+            mstar_tmp.columns = pd.MultiIndex.from_frame(idx)
+            mstar_tmp.index.rename('mass_range',inplace=True)
+            if bs_perc.empty:
+               bs_perc=mstar_tmp.copy()
+            else:
+               bs_perc=bs_perc.copy().join(mstar_tmp)
+            perc_colnames=mstar_tmp.columns.get_level_values(1)
 
-         edd_tmp=edd_tmp.droplevel(1)
-         bs_perc=bs_perc.join(edd_tmp)
+            if (z == 2.7) and (key=='Q'):
+               a=np.empty((bs_perc.index.shape[0],len(perc_colnames)))
+               a.fill(np.nan)    
+               bs_perc=bs_perc.join(pd.DataFrame(np.array(a), 
+                                    index=bs_perc.index, columns=pd.MultiIndex.from_product([[sfr_str],perc_colnames])))
+            else:
+               bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs[sfr_str]]), 
+                                                   index=bs_perc.index, columns=pd.MultiIndex.from_product([[sfr_str],perc_colnames])))
+                                                   
+            bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row,[0.05,0.1585,0.5,0.8415,0.95]) for row in gals_bs[lum_str]]), 
+                                             index=bs_perc.index, columns=pd.MultiIndex.from_product([[lum_str],perc_colnames])))
+            #bs_perc=bs_perc.join(pd.DataFrame(np.array([np.quantile(row['luminosity']/row['SFR'],[0.05,0.1585,0.5,0.8415,0.95]) 
+            #                                             for i,row in gals_bs.iterrows()]), 
+            #                                 index=bs_perc.index, columns=pd.MultiIndex.from_product([['lx_SFR'],perc_colnames])))
+            edd_tmp=grouped_linear.edd_ratio.apply(lambda s: pd.DataFrame({
+                                                      (lambda_str,"mean"): [np.mean(s)],
+                                                      (lambda_str,"median"): [np.median(s)],
+                                                      }))
 
-      # save dataframe to file and add to dictionary for use
-      if methods['edd_ratio']=="Schechter":
-         bs_perc.to_csv(curr_path+f'bs_perc_z{z}_alpha{alpha_z}_lambda{lambda_z}_lambdac{lambda_char:.3f}'+suffix+'.csv')
-      elif methods['edd_ratio']=="Gaussian":
-         bs_perc.to_csv(curr_path+f'bs_perc_z{z}_mean{alpha_z}_sigma{lambda_z}_lambdac{lambda_char:.2f}'+suffix+'.csv')
-      df_dic[par_str+f'{par}']=bs_perc
-      #print('finished',lambda_z,alpha_z)
+            bs_perc=bs_perc.join(AGN_fraction, rsuffix=str)
+            #if case=='active':
+            #   print(bs_perc.AGN_fraction)
+
+            lx_xrb=(((10.**29.37)*((1.+z)**2.03))/10.**42.)*(10.**bs_perc[(mstar_str,0.5)])+(((10.**39.28)*((1.+z)**1.31)*bs_perc[(sfr_str,0.5)])/10.**42.)
+            for column in bs_perc[lum_str]:
+               bs_perc[(lum_str,column)]=bs_perc[(lum_str,column)]-lx_xrb
+
+            edd_tmp=edd_tmp.droplevel(1)
+            bs_perc=bs_perc.join(edd_tmp)
+
+         # save dataframe to file and add to dictionary for use
+         if methods['edd_ratio']=="Schechter":
+            filename=curr_path+f'bs_perc_z{z}_alpha{alpha_z}_lambda{lambda_z}_lambdac{lambda_char:.3f}{cases[case]}'+suffix+'.csv'#_nh{nh_thresh}
+         elif methods['edd_ratio']=="Gaussian":
+            filename=curr_path+f'bs_perc_z{z}_mean{alpha_z}_sigma{lambda_z}_lambdac{lambda_char:.2f}{cases[case]}'+suffix+'.csv'#_nh{nh_thresh}
+         bs_perc.to_csv(filename)
+         df_dic[par_str+f'{par}']=bs_perc
+         #print('finished',lambda_z,alpha_z)
 
    ########################
    # finish XLF plot
@@ -317,20 +382,26 @@ def simulation(var_file):
    if methods['edd_ratio']=="Schechter":
       if par_str == 'lambda':
          title_str=r'XLF, U={}, $\alpha$={}, z={}'.format(methods['duty_cycle'],alpha_z,z)
-         file_name=curr_path+f'XLF_z{z}_alpha{alpha_z}'+par_str+'.pdf'
+         common_str=f'z{z}_alpha{alpha_z}'+par_str
+         file_name=curr_path+'XLF_'+common_str+'.pdf'
       elif par_str == 'alpha':
          title_str=r'XLF, U={}, $\lambda$={}, z={}'.format(methods['duty_cycle'],lambda_z,z)
-         file_name=curr_path+f'XLF_z{z}_lambda{lambda_z}'+par_str+'.pdf'
+         common_str=f'z{z}_lambda{lambda_z}'+par_str
+         file_name=curr_path+f'XLF_'+common_str+'.pdf'
    elif methods['edd_ratio']=="Gaussian":
       if par_str == 'sigma':
          title_str=r'XLF, U={}, $\mu$={}, z={}'.format(methods['duty_cycle'],mu_z,z)
-         file_name=curr_path+f'XLF_z{z}_mean{mu_z}'+par_str+'.pdf'
+         common_str=f'z{z}_mean{mu_z}'+par_str
+         file_name=curr_path+'XLF_'+common_str+'.pdf'
       elif par_str == 'mean':
          title_str=r'XLF, U={}, $\sigma$={}, z={}'.format(methods['duty_cycle'],sigma_z,z)
-         file_name=curr_path+f'XLF_z{z}_sigma{sigma_z}'+par_str+'.pdf'
+         common_str=f'z{z}_sigma{sigma_z}'+par_str
+         file_name=curr_path+'XLF_'+common_str+'.pdf'
    plt.title(title_str)
    plt.savefig(file_name, format = 'pdf', bbox_inches = 'tight',transparent=True)
 
+   #from Plots import plot_dutycycle
+   #plot_dutycycle(df_dic,filename=working_dir+'Duty_cycles_'+common_str,i=1)
 
    ################################
    ## Plot ##
