@@ -18,27 +18,72 @@ curr_dir=os.getcwd()
 # import data from IDL
 # SF
 read_data = readsav('./IDL_data/vars_EuclidAGN_90.sav')#,verbose=True
-
-data={}
+all_data={}
 for key, val in read_data.items():
-    data[key]=np.copy(val)
-    data[key][data[key] == 0.] = np.nan
+    all_data[key]=np.copy(val)
+    all_data[key][all_data[key] == 0.] = np.nan
+   
+read_data = readsav('./IDL_data/active_only/vars_EuclidAGN_90.sav')#,verbose=True
+active_data={}
+for key, val in read_data.items():
+    active_data[key]=np.copy(val)
+    active_data[key][active_data[key] == 0.] = np.nan
 #print(data.keys())
 
 # Q
 read_data = readsav('./IDL_data/vars_EuclidAGN_90_Q.sav')#,verbose=True
-data_Q={}
+all_data_Q={}
 for key, val in read_data.items():
-    data_Q[key]=np.copy(val)
-    data_Q[key][data_Q[key] == 0.] = np.nan
+    all_data_Q[key]=np.copy(val)
+    all_data_Q[key][all_data_Q[key] == 0.] = np.nan
+   
+read_data = readsav('./IDL_data/active_only/vars_EuclidAGN_90_Q.sav')#,verbose=True
+active_data_Q={}
+for key, val in read_data.items():
+    active_data_Q[key]=np.copy(val)
+    active_data_Q[key][active_data_Q[key] == 0.] = np.nan
 
 # SB
 read_data = readsav('./IDL_data/vars_EuclidAGN_90_SB.sav')#,verbose=True
-
-data_SB={}
+all_data_SB={}
 for key, val in read_data.items():
-    data_SB[key]=np.copy(val)
-    data_SB[key][data_SB[key] == 0.] = np.nan
+    all_data_SB[key]=np.copy(val)
+    all_data_SB[key][all_data_SB[key] == 0.] = np.nan
+
+read_data = readsav('./IDL_data/active_only/vars_EuclidAGN_90_SB.sav')#,verbose=True
+active_data_SB={}
+for key, val in read_data.items():
+    active_data_SB[key]=np.copy(val)
+    active_data_SB[key][active_data_SB[key] == 0.] = np.nan
+
+# duty cycles from appendix Carraro+20
+data_duty_cycles=np.array([[np.nan,np.nan,np.nan,19./(19+4244 ), 75./(2514 + 75), 117./(1214+117), 38./(239+ 38)],
+                           [np.nan,np.nan,14./22159,56./(56+15431),175./(7957 +175), 370./(3888+370),142./(761+142)], 
+                           [np.nan,np.nan,np.nan,47./(47+13451),177./(11334+177), 368./(5273+368),172./(954+172)],
+                           [np.nan,np.nan,np.nan, 3./(3 +264  ), 98./(159  + 98), 166./(726 +166), 70./(66 + 70)] ])
+data_duty_cycles_Q=np.array([[ 12./(12+867), 19./(19+830),14./(14+271)],
+                              [ 19./(19+2594), 72./(72+3354),25./(25+1107)]]) 
+data_duty_cycles_SB=np.array([[ 4./(58+4), 5./(6+5),3./(2+3)],
+                              [ 7./(162+7), 10./(162+10),5./(43+5)]]) 
+
+"""
+m_sf=[10.21,10.70,11.14]
+m_sb=[ 9.87,10.52,10.96]
+m_q=[10.27,10.74,11.16]
+plt.plot(m_sf,data_duty_cycles[0],label='starforming')
+plt.plot(m_q,data_duty_cycles_Q[0],label='quiescent')
+plt.plot(m_sb,data_duty_cycles_SB[0],label='starburst')
+plt.legend()
+plt.title('z=0.45')
+plt.show()
+#
+plt.plot(m_sf,data_duty_cycles[1],label='starforming')
+plt.plot(m_q,data_duty_cycles_Q[1],label='quiescent')
+plt.plot(m_sb,data_duty_cycles_SB[1],label='starburst')
+plt.legend()
+plt.title('z=1.0')
+plt.show()
+"""
 #%%
 # Universe parameters
 z = 1.
@@ -138,7 +183,7 @@ def read_dfs(paths,keys=None,sigma=True,mean=True,lambdac=False):
          df=pd.read_csv(p,header=[0,1],index_col=0)
          # percentile values in column names to float type instead of string
          #df.columns.set_levels(df.columns.levels[1].astype(float,errors='ignore'),level=1,inplace=True)
-         df.columns.set_levels(convert_index_to_float(df.columns.levels[1]),level=1,inplace=True)
+         df.columns=df.columns.set_levels(convert_index_to_float(df.columns.levels[1]),level=1)
          dictionary[key]=df
       return dictionary
     else:
@@ -147,7 +192,7 @@ def read_dfs(paths,keys=None,sigma=True,mean=True,lambdac=False):
       for p in paths:
          df=pd.read_csv(p,header=[0,1],index_col=0)
          #df.columns.set_levels(df.columns.levels[1].astype(float,errors='ignore'),level=1,inplace=True)
-         df.columns.set_levels(convert_index_to_float(df.columns.levels[1]),level=1,inplace=True)
+         df.columns=df.columns.set_levels(convert_index_to_float(df.columns.levels[1]),level=1)
          pars=dict(re.findall(pattern, p))
          if '_SB.csv' in p:
             new_key='SB '
@@ -156,7 +201,7 @@ def read_dfs(paths,keys=None,sigma=True,mean=True,lambdac=False):
          else:
             new_key=''
 
-         if 'Gaussian' in p:
+         if 'mean' in p:
             new_key+=fr"Gaussian"
             if mean:
                new_key+=fr" $\mu={float(pars['mean']):.2f}$"
@@ -168,6 +213,7 @@ def read_dfs(paths,keys=None,sigma=True,mean=True,lambdac=False):
             #df_dict[fr"Gaussian $\mu={pars['mean']}$"]=df
          else:
             new_key+=fr"Schechter $x*={float(pars['lambda']):.2f}$, $\alpha={float(pars['alpha']):.2f}$"
+
          if (lambdac==True) and ('lambdac' in pars.keys()):
                new_key+=fr"; $\zeta_c={np.asarray(pars['lambdac'], dtype=np.float64):.2f}$"
                #new_key+=fr"; $\zeta_c={pars['lambdac']:.2f}$"
@@ -181,7 +227,15 @@ def read_dfs(paths,keys=None,sigma=True,mean=True,lambdac=False):
 #%%
 # function for comparison subplots
 def comp_subplot(ax,df_dic,method_legend=None,leg_title=None,m_min=2,i=0,
-                  SB=[],Q=[],SF=[],legend=True,legend_loc='lower right',markers_style=None,lambda_ave=False,ncol=1):
+                  SB=[],Q=[],SF=[],legend=True,legend_loc='lower right',markers_style=None,lambda_ave=False,ncol=1,active=False):
+   if active:
+      data=active_data
+      data_Q=active_data_Q
+      data_SB=active_data_SB
+   else:
+      data=all_data
+      data_Q=all_data_Q
+      data_SB=all_data_SB
    #ax.set_yscale('log')
    # "real" datapoints
    if Q or SB:
@@ -275,11 +329,11 @@ def subplot_data_LX(ax,data, label, marker,m_min=2):
 
 #%%
 # make 1 single comparison plot
-def comp_plot(df_dic,method_legend=None,filename='Comparisons',leg_title=None,i=0,SB=[],Q=[],SF=[],m_min=2,legend_loc='lower right',markers_style=None,lambda_ave=False,ncol=1):
+def comp_plot(df_dic,method_legend=None,filename='Comparisons',leg_title=None,i=0,SB=[],Q=[],SF=[],m_min=2,legend_loc='lower right',markers_style=None,lambda_ave=False,ncol=1,active=False):
     fig,ax = plt.subplots(figsize=[9, 6])
     #plt.rcParams["axes.prop_cycle"] = get_cycle("tab10")
 
-    comp_subplot(ax,df_dic,method_legend,leg_title,i=i,Q=Q,SB=SB,SF=SF,m_min=m_min,legend_loc=legend_loc,markers_style=markers_style,lambda_ave=lambda_ave,ncol=ncol)
+    comp_subplot(ax,df_dic,method_legend,leg_title,i=i,Q=Q,SB=SB,SF=SF,m_min=m_min,legend_loc=legend_loc,markers_style=markers_style,lambda_ave=lambda_ave,ncol=ncol,active=active)
     
     ax.set_yscale('log')
     #ax.set_ylim(bottom=8e-4)
@@ -287,21 +341,32 @@ def comp_plot(df_dic,method_legend=None,filename='Comparisons',leg_title=None,i=
     ax.set_xlabel('log$_{10}$<M$_*$> (M$_\odot$)')
     ax.set_ylabel('<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)')
     plt.savefig(curr_dir+'/Ros_plots/'+filename+f'_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) ;
+    plt.close(fig)
     return
 #%%
 # Plot SFR vs LX
 #def SFR_LX(df_dic,data,leg_title=None,m_min=2):
-def SFR_LX(df_dic,data,leg_title=None,m_min=2,filename='SFvsLX',SB=[],Q=[],SF=[]):
+def SFR_LX(df_dic,leg_title=None,m_min=2,filename='SFvsLX',SB=[],Q=[],SF=[],active=False):
    fig,ax = plt.subplots(figsize=[12, 8])
    
-   SFR_LX_subplot(ax,df_dic,data,leg_title=leg_title,m_min=m_min,SB=SB,Q=Q,SF=SF)
+   SFR_LX_subplot(ax,df_dic,leg_title=leg_title,m_min=m_min,SB=SB,Q=Q,SF=SF,active=active)
 
    #plt.text(0.137, 0.78, f'z = {z:.1f}', transform=fig.transFigure, **text_pars)
    #plt.text(0.137, 0.865, f"z = {z:.1f}\nHalo to M*: {methods['halo_to_stars']}\nEddington ratio: {methods['edd_ratio']}\nDuty Cycle: {methods['duty_cycle']}\nBol corr: {methods['bol_corr']}", transform=fig.transFigure, **text_pars)
    ax.set_ylabel('<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)')
    plt.savefig(curr_dir+'/Ros_plots/'+filename+f'_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
+   plt.close(fig)
 
-def SFR_LX_subplot(ax,df_dic,data,leg_title=None,m_min=2,SB=[],Q=[],SF=[]):
+def SFR_LX_subplot(ax,df_dic,leg_title=None,m_min=2,SB=[],Q=[],SF=[],active=False):
+   if active:
+      data=active_data
+      data_Q=active_data_Q
+      data_SB=active_data_SB
+   else:
+      data=all_data
+      data_Q=all_data_Q
+      data_SB=all_data_SB
+
    edge_width=0.5
    handles=[]
 
@@ -361,8 +426,10 @@ def SFR_LX_subplot(ax,df_dic,data,leg_title=None,m_min=2,SB=[],Q=[],SF=[]):
       handles+=subplot_data_SFR(ax,data_SB, label,marker="d",_min=_min,_max=_max,m_min=0,edge_width=edge_width)
 
    sc=ax.scatter([],[], vmin = _min, vmax = _max)
+   sc.set_clim(_min,_max)
+   print('mmin', _min, 'mmax',_max)
    # colorbar, labels, legend, etc
-   fig.colorbar(sc,pad=0.005).set_label('Stellar mass (M$_\odot$)')
+   fig.colorbar(sc,ax=ax,pad=0.005).set_label('Stellar mass (M$_\odot$)')
    leg=ax.legend(handles=handles, loc='lower right',title=leg_title,handlelength=3)
    leg._legend_box.align= "left"
    #ax.legend(handles=handles, loc='lower right',title=leg_title,handlelength=3)
@@ -399,6 +466,40 @@ def subplot_data_SFR(ax,data, label, marker,_min,_max,m_min=2,edge_width=1):
    handle = [mlines.Line2D([], [], label=label,**data_pars)]
    return handle
 
+def plot_dutycycle(df_dic,filename='measured_duty_cycles',i=0,m_str='(9.5, 10.0]',mstar_str='stellar_mass',m_min=2,legend_loc='lower right',method_legend=None):
+   fig,ax = plt.subplots(figsize=[9, 6])
+    #plt.rcParams["axes.prop_cycle"] = get_cycle("tab10")
+
+   subplot_dutycycle(df_dic,ax=ax,i=i,m_str=m_str,mstar_str=mstar_str,m_min=m_min,legend_loc=legend_loc,method_legend=method_legend)
+
+   ax.set_yscale('log')
+   ax.set_xlabel('log$_{10}$<M$_*$> (M$_\odot$)')
+   ax.set_ylabel('output U')
+   plt.savefig(curr_dir+'/Ros_plots/'+filename+f'_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
+   plt.close(fig);
+   return
+
+def subplot_dutycycle(df_dic,ax,i=0,m_str='(9.5, 10.0]',mstar_str='stellar_mass',m_min=2,legend_loc='lower right',method_legend=None):
+   markers_size=(plt.rcParams['lines.markersize']*1.2)**2
+   edge_width=0.5
+
+   # data U
+   ax.scatter(active_data['m_ave'][0,m_min:,i], data_duty_cycles[i][m_min:], edgecolors=cols[0], marker='s',label='Carraro et al. (2020)',color='None')#
+
+   # mocks U
+   for j,(s,df) in enumerate(df_dic.items()):
+      df.loc[m_str:].plot.scatter(x=(mstar_str,0.5),y='AGN_fraction',edgecolors='Black', label=s,color=cols[j], s=markers_size, linewidth=edge_width,ax=ax)
+      df.loc[m_str:].plot(x=(mstar_str,0.5),y='AGN_fraction', color=cols[j],ax=ax,linestyle=ls[j],alpha=0.5)
+
+   if method_legend:
+      ax.text(0.03, 0.965, method_legend, transform=ax.transAxes, **text_pars)
+
+   leg=ax.legend(loc=legend_loc,framealpha=0.4)#,title=leg_title,ncol=ncol
+   leg._legend_box.align= "left"
+
+   ax.set_yscale('log')
+   return
+
 def generate_pie_markers(n=4):
    # generates n markers where each is a slice of pie chart
    # of the same size
@@ -411,8 +512,278 @@ def generate_pie_markers(n=4):
       markers.append(m)
 
    return markers
-"""
+
+###############################
+######### Fig Test ###############
+###############################
+# figure to test results vs Viola    
+z = 1.
+i=reds_dic.get(z) # needed for IDL data
+paths = glob.glob(curr_dir+'/Ros_plots/05_Wrong_scatter/Standard_R&V/Simple_average/bs_perc_z1.0_lambda-2.35_alpha0.10_lambdac-2.381.csv') + \
+      glob.glob(curr_dir+'/Ros_plots/05_Wrong_scatter/Standard_R&V/Weighted_bootstrap/bs_perc_z1.0_lambda-2.35_alpha0.10_lambdac-2.381.csv') + \
+      glob.glob(curr_dir+'/Ros_plots/05_Wrong_scatter/Standard_R&V/Subtract_XRBlum/bs_perc_z1.0_lambda-2.35_alpha0.10_lambdac-2.381.csv') + \
+      glob.glob(curr_dir+f'/Ros_plots/05_Wrong_scatter/R&V_Gaussian/bs_perc_z1.0_mean-2.5_sigma0.3_lambdac-2.40.csv') #+\
+      #glob.glob(curr_dir+'/Ros_plots/Standard_R&V/bs_perc_z1.0_lambda-2.35_alpha0.10_lambdac-2.381_noduty.csv') + \
+      #glob.glob(curr_dir+'/Ros_plots/R&V_Schechter/bs_perc_z1.0_alpha0.1_lambda-2.35_lambdac-2.615.csv') 
+#print(paths)
+#read DFs
+keys=['Schechter $x*=-2.35$, $\\alpha=0.10$','Schechter $x*=-2.35$, $\\alpha=0.10$ bootstrap','Schechter $x*=-2.35$, $\\alpha=0.10$ Lx - Lxrb','Gaussian $\\mu=-2.50$, $\\sigma=0.30$']
+df_dic = read_dfs(paths,keys)
+#print(df_dic.keys())
+
+comp_plot(df_dic,filename='Compare_w_Viola',i=i)
 #%%
+###################################
+###### Measured Duty cycles #######
+###################################
+########
+# duty cycle plots of all tested Edd ratios 
+# don't need to run these everytime
+"""
+zees = [1.,0.45]
+for z in zees:
+   i=reds_dic.get(z) # needed for IDL data
+   paths = sorted(glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_*active*.csv'))
+
+   for path in paths:
+      df_dic = read_dfs([path],lambdac=True)
+      plot_dutycycle(df_dic,filename=f'R&V_Gaussian/duty_cycle_'+path[path.rfind('/')+1:path.rfind('.csv')-1],i=i)
+
+
+   paths = sorted(glob.glob(curr_dir+f'/Ros_plots/R&V_Schechter/bs_perc_z{z}_*active*.csv'))
+
+   for path in paths:
+      df_dic = read_dfs([path],lambdac=True)
+      plot_dutycycle(df_dic,filename=f'R&V_Schechter/duty_cycle_'+path[path.rfind('/')+1:path.rfind('.csv')-1],i=i)
+"""
+#######
+z = 1.
+i=reds_dic.get(z) # needed for IDL data
+# make 4 comparison plots
+fig,axs = plt.subplots(3,1,figsize=[5, 10], sharex=True, sharey=True, gridspec_kw={'hspace': 0, 'wspace': 0})
+
+folders=['Duty_cycles','Duty_cycles_NH23','Duty_cycles_noNH']
+strings=['Cut at $\log(N_H)=24$','Cut at $\log(N_H)=23$','No cut in $N_H$']
+for j,(f,s) in enumerate(zip(folders,strings)):
+   paths = sorted(glob.glob(curr_dir+f'/Ros_plots/{f}/bs_perc_z{z}_*_active*.csv'))
+   #print(paths)
+   keys=['Georgakakis et al. (2017)','Man et al. (2019)','Schulze et al. (2015)','const=0.2']
+
+   df_dic = read_dfs(paths,keys,lambdac=True)
+   subplot_dutycycle(df_dic,axs[j],i=i,legend_loc=(1.02,0),method_legend=s)
+
+#fig.text(0.5, 0.07, r'$\log_{10}$ <M$_*$> (M$_\odot$)', va='center', ha='center',size='x-large')
+#fig.text(0.08, 0.5, 'output U', va='center', ha='center', rotation='vertical',size='x-large')
+plt.savefig(curr_dir+'/Ros_plots/measured_duty_cycles_vsNH'+f'_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
+plt.close(fig);
+
+#######
+#######
+z = 1.
+i=reds_dic.get(z) # needed for IDL data
+best_duties_10=['alpha-1.5_lambda-2.0',
+'alpha-1.5_lambda-1.8',
+'alpha-1.0_lambda-1.8',
+'alpha-0.5_lambda-1.6',
+'alpha-0.4_lambda-1.6',
+'alpha-0.3_lambda-1.6',
+'alpha-0.2_lambda-1.6',
+'mean-1.5_sigma0.3',
+'mean-1.75_sigma0.3',
+'mean-2.0_sigma0.5',
+'mean-2.0_sigma0.7']
+
+best_duties_45=['alpha-0.2_lambda-2.5',
+'alpha-0.3_lambda-2.5',
+'alpha-0.4_lambda-2.5',
+'alpha-0.5_lambda-2.5',
+'alpha0.2_lambda-2.5',
+'alpha0.3_lambda-2.5',
+'alpha0.4_lambda-2.5',
+'mean-2.5_sigma0.3']
+
+duties_list=[best_duties_45,best_duties_10]
+
+########### 
+# U Schulze
+zees=[0.45,1.0]
+for z,best_duties in zip(zees,duties_list):
+   i=reds_dic.get(z) # needed for IDL data
+   paths=[]
+   paths_active=[]
+   for d in best_duties:
+      paths+=glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_{d}*_all.csv')
+      paths+=glob.glob(curr_dir+f'/Ros_plots/R&V_Schechter/bs_perc_z{z}_{d}*_all.csv')
+      paths_active+=glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_{d}*_active.csv')
+      paths_active+=glob.glob(curr_dir+f'/Ros_plots/R&V_Schechter/bs_perc_z{z}_{d}*_active.csv')
+   paths=sorted(paths)
+   df_dic = read_dfs(paths,lambdac=True)
+   comp_plot(df_dic,i=i,filename=f'Best_mdc_LX_M',lambda_ave=True,legend_loc=(1.02,0))
+
+   paths_active=sorted(paths_active)
+   df_dic = read_dfs(paths_active,lambdac=True)
+   plot_dutycycle(df_dic,i=i,filename=f'Best_measured_duty_cycles',legend_loc=(1.02,0))
+   comp_plot(df_dic,i=i,filename=f'Best_mdc_LX_M_active',lambda_ave=True,active=True,legend_loc=(1.02,0))
+
+########### 
+# U const=0.2
+for z in zees:
+   i=reds_dic.get(z) # needed for IDL data
+   paths=[]
+   paths_active=[]
+   for d in best_duties:
+      paths+=glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian_Uconst02/bs_perc_z{z}_{d}*_all.csv')
+      paths+=glob.glob(curr_dir+f'/Ros_plots/R&V_Schechter_Uconst02/bs_perc_z{z}_{d}*_all.csv')
+      paths_active+=glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian_Uconst02/bs_perc_z{z}_{d}*_active.csv')
+      paths_active+=glob.glob(curr_dir+f'/Ros_plots/R&V_Schechter_Uconst02/bs_perc_z{z}_{d}*_active.csv')
+   paths=sorted(paths)
+   df_dic = read_dfs(paths,lambdac=True)
+   comp_plot(df_dic,i=i,filename=f'Best_mdc_LX_M_Uconst02',lambda_ave=True,legend_loc=(1.02,0))
+
+   paths_active=sorted(paths_active)
+   df_dic = read_dfs(paths_active,lambdac=True)
+   plot_dutycycle(df_dic,i=i,filename=f'Best_measured_duty_cycles_Uconst02',legend_loc=(1.02,0))
+   comp_plot(df_dic,i=i,filename=f'Best_mdc_LX_M_active_Uconst02',lambda_ave=True,active=True,legend_loc=(1.02,0))
+
+#%%
+####################################
+### Duty cycle effects on active ###
+####################################
+z = 1.
+i=reds_dic.get(z) # needed for IDL data
+# make 4 comparison plots
+fig,axs = plt.subplots(2,2,figsize=[15, 10], sharex=True, sharey=True, gridspec_kw={'hspace': 0, 'wspace': 0})
+
+##########################################################
+# top-left   
+# simple mean, active no NH cut
+paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles_testmean_noNH/bs_perc_z{z}_mean-2.25_sigma0.3*_active*.csv'))
+#print(paths)
+#read DFs
+keys=['Georgakakis et al. (2017)','Man et al. (2019)','Schulze et al. (2015)','const=0.2']
+df_dic = read_dfs(paths,keys,lambdac=True)
+
+method_legend=f"Active (logLX>42), simple mean, no NH cut"
+#q = generate_pie_markers(2)
+#markers_style=1*['o']+[q[0]]+[q[1]]+1*['o']
+leg_title=r'Duty cycle'
+comp_subplot(axs[0,0],df_dic,leg_title=leg_title,i=i,method_legend=method_legend,active=True)#,markers_style=markers_style
+##########################################################
+# top-right
+# simple mean, active no NH cut
+paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles_testmean/bs_perc_z{z}_mean-2.25_sigma0.3*_active*.csv'))
+
+#print(paths)
+#read DFs
+df_dic = read_dfs(paths,keys)
+
+method_legend=f"Active (logLX>42), simple mean, NH cut"
+#q = generate_pie_markers(4)
+#markers_style=[q[3],q[2],q[1],q[0]]
+leg_title=r'Duty cycle'
+comp_subplot(axs[0,1],df_dic,leg_title=leg_title,i=i,legend=False,active=True,method_legend=method_legend)#,markers_style=markers_style
+##########################################################
+# bottom-left
+paths =sorted( glob.glob(curr_dir+f'/Ros_plots/Duty_cycles_noNH/bs_perc_z{z}_*_active*.csv'))
+#print(paths)
+#read DFs
+df_dic = read_dfs(paths,keys)
+
+method_legend=f"Active (logLX>42), weighted mean, no NH cut"
+leg_title=r"M$_{\rm BH}$-M$_*$ scaling relation"
+comp_subplot(axs[1,0],df_dic,leg_title=leg_title,i=i,legend=False,active=True,method_legend=method_legend)
+
+##########################################################
+# bottom-right
+# Comparison of Davis slopes # but now it's R&V
+paths = sorted(glob.glob(curr_dir+'/Ros_plots/Duty_cycles/bs_perc_z1.0_*_active*.csv') )
+#print(paths)
+
+#read DFs
+df_dic = read_dfs(paths,keys)
+
+method_legend=f"Active (logLX>42), weighted mean, NH cut"
+comp_subplot(axs[1,1],df_dic,leg_title=leg_title,i=i,legend=False,active=True,method_legend=method_legend)
+
+##########################################################
+# common lables:
+fig.text(0.5, 0.07, r'$\log$ <M$_*$> (M$_\odot$)', va='center', ha='center',size='x-large')
+fig.text(0.08, 0.5, '<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)', va='center', ha='center', rotation='vertical',size='x-large')
+#plt.ylim(2e0,8e1)
+plt.yscale('log')
+plt.savefig(curr_dir+f'/Ros_plots/duty_cycle_effects_active_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
+plt.close(fig);
+
+#%%
+#################################
+### Duty cycle effects on all ###
+#################################
+z = 1.
+i=reds_dic.get(z) # needed for IDL data
+# make 4 comparison plots
+fig,axs = plt.subplots(2,2,figsize=[15, 10], sharex=True, sharey=True, gridspec_kw={'hspace': 0, 'wspace': 0})
+
+##########################################################
+# top-left   
+# simple mean, all no NH cut
+paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles_testmean_noNH/bs_perc_z{z}_mean-2.25_sigma0.3*_all*.csv'))
+#print(paths)
+#read DFs
+keys=['Georgakakis et al. (2017)','Man et al. (2019)','Schulze et al. (2015)','const=0.2']
+df_dic = read_dfs(paths,keys,lambdac=True)
+
+method_legend=f"All galaxies, simple mean, no NH cut"
+q = generate_pie_markers(4)
+markers_style=[q[3],q[2],q[1],q[0]]
+leg_title=r'Duty cycle'
+comp_subplot(axs[0,0],df_dic,leg_title=leg_title,i=i,method_legend=method_legend,active=False,markers_style=markers_style)
+##########################################################
+# top-right
+# simple mean, all no NH cut
+paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles_testmean/bs_perc_z{z}_mean-2.25_sigma0.3*_all*.csv'))
+
+#print(paths)
+#read DFs
+df_dic = read_dfs(paths,keys)
+
+method_legend=f"All galaxies, simple mean, NH cut"
+leg_title=r'Duty cycle'
+comp_subplot(axs[0,1],df_dic,leg_title=leg_title,i=i,legend=False,active=False,method_legend=method_legend,markers_style=markers_style)
+##########################################################
+# bottom-left
+paths =sorted( glob.glob(curr_dir+f'/Ros_plots/Duty_cycles_noNH/bs_perc_z{z}_*_all*.csv'))
+print(keys)
+print(paths)
+#read DFs
+df_dic = read_dfs(paths,keys)
+
+method_legend=f"All galaxies, mean with duty cycle, no NH cut"
+leg_title=r"M$_{\rm BH}$-M$_*$ scaling relation"
+comp_subplot(axs[1,0],df_dic,leg_title=leg_title,i=i,legend=False,active=False,method_legend=method_legend)
+
+##########################################################
+# bottom-right
+# Comparison of Davis slopes # but now it's R&V
+paths = sorted(glob.glob(curr_dir+'/Ros_plots/Duty_cycles/bs_perc_z1.0_*_all*.csv') )
+print(paths)
+
+#read DFs
+df_dic = read_dfs(paths,keys)
+
+method_legend=f"All galaxies, mean with duty cycle, NH cut"
+comp_subplot(axs[1,1],df_dic,leg_title=leg_title,i=i,legend=False,active=False,method_legend=method_legend)
+
+##########################################################
+# common lables:
+fig.text(0.5, 0.07, r'$\log$ <M$_*$> (M$_\odot$)', va='center', ha='center',size='x-large')
+fig.text(0.08, 0.5, '<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)', va='center', ha='center', rotation='vertical',size='x-large')
+#plt.ylim(2e0,8e1)
+plt.yscale('log')
+plt.savefig(curr_dir+f'/Ros_plots/duty_cycle_effects_all_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
+plt.close(fig);
+
+#%%
+"""
 ###############################
 ######### Fig 1 ###############
 ###############################
@@ -454,97 +825,113 @@ params = {'legend.fontsize': 'medium',
           'legend.title_fontsize':'medium'}
 plt.rcParams.update(params)
 
+reds=[0.45,1.0]
+for z in reds:
+   i=reds_dic.get(z) # needed for IDL data
+   # make 4 comparison plots
+   fig,axs = plt.subplots(2,2,figsize=[15, 10], sharex=True, sharey=True, gridspec_kw={'hspace': 0, 'wspace': 0})
 
-# make 4 comparison plots
-fig,axs = plt.subplots(2,2,figsize=[15, 10], sharex=True, sharey=True, gridspec_kw={'hspace': 0, 'wspace': 0})
+   ##########################################################
+   # top-left   
+   # # Gaussian width Edd ratio distributions comparison
+   if z==0.45: 
+      standard_str="_mean-2.0_sigma0.3"
+      schechter_str="_alpha-0.3_lambda-2.0"
+   else:
+      standard_str="_mean-1.5_sigma0.3"
+      schechter_str="_alpha-0.3_lambda-2.25"
+   paths = sorted(glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-1.0_sigma0.3*_all.csv'))+ \
+            glob.glob(curr_dir+f'/Ros_plots/R&V_Schechter/bs_perc_z{z}{schechter_str}*_all.csv') + \
+            sorted(glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}{standard_str}*_all.csv'))+ \
+            sorted(glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-2.5*_all.csv'))
+            #glob.glob(curr_dir+'/Ros_plots/R&V_Schechter/bs_perc_z1.0_alpha1.5_lambda0.0*.csv') + \
 
-##########################################################
-# top-left
-paths = glob.glob(curr_dir+'/Ros_plots/Standard_R&V/bs_perc_z1.0_lambda-0.80_alpha0.10*.csv') + \
-   sorted(glob.glob(curr_dir+f'/Ros_plots/Scaling_rels/bs_perc_z{z}_lambda-0.80_alpha0.10*.csv') )
-#print(paths)
-keys=['Reines & Volonteri (2015)', 'Davis et al. (2018)', 'Sahu et al. (2019)', 'Shankar et al. (2016)']
-#read DFs
-df_dic = read_dfs(paths,keys)
+   #print(paths)
+   #read DFs
+   df_dic = read_dfs(paths,lambdac=True)
 
-#method_legend=f"Halo to M*: {methods['halo_to_stars']}\nEddington ratio: {methods['edd_ratio']}\nDuty Cycle: {methods['duty_cycle']}\nBol corr: {methods['bol_corr']}"
-leg_title=r"M$_{\rm BH}$-M$_*$ scaling relation"
-comp_subplot(axs[0,0],df_dic,leg_title=leg_title,i=i)
-#comp_plot(df_dic,filename='Talk_scal_rels',leg_title=leg_title,i=i)
+   #method_legend=f"Halo to M*: {methods['halo_to_stars']}\nDuty Cycle: {methods['duty_cycle']}\nBH_mass: {methods['BH_mass_method']}\nBol corr: {methods['bol_corr']}"
 
-##########################################################
-# top-right
-# # Gaussian width Edd ratio distributions comparison
-paths = glob.glob(curr_dir+'/Ros_plots/Standard_R&V/bs_perc_z1.0_lambda-0.80_alpha0.10*.csv') + \
-         sorted(glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}*.csv'))
+   #markers_style=[(q[0],   (plt.rcParams['lines.markersize']*1.2)**2,   1, 'left')]+\
+   #            2*[('o',   (plt.rcParams['lines.markersize']*1.2)**2,         1, 'full')]+\
+   #               [(q[1], (plt.rcParams['lines.markersize']*1.2)**2,    1, 'right')]+\
+   #               [(q[2],   (plt.rcParams['lines.markersize']*1.2)**2,      0.5, 'bottom')]+\
+   #               [(q[3],   (plt.rcParams['lines.markersize']*1.2)**2,      0.5, 'top')]+\
+   #            2*[('o',   (plt.rcParams['lines.markersize']*1.2)**2,         1, 'full')]
+   q = generate_pie_markers(2)
+   markers_style=1*['o']+[q[0]]+[q[1]]+1*['o']
+   leg_title='Eddington ratio distribution'
+   comp_subplot(axs[0,0],df_dic,leg_title=leg_title,i=i,markers_style=markers_style)#,lambda_ave=True,ncol=2
+   paths = sorted(glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}*.csv'))
+   df_dic = read_dfs(paths)
+   #comp_plot(df_dic,filename='Talk_Edd_distr',leg_title=leg_title,i=i,ncol=2)
 
-#read DFs
-df_dic = read_dfs(paths)
+   ##########################################################
+   # top-right
+   # Duty Cycle comparison
+   #paths = glob.glob(curr_dir+f'/Ros_plots/Standard_R&V/bs_perc_z{z}_mean-2.25_sigma0.3*.csv') + \
+   #         glob.glob(curr_dir+f'/Ros_plots/Duty_Cycles/bs_perc_z{z}_mean-2.25_sigma*.csv')
+   #keys=['Schulze et al. (2015)','Georgakakis et al. (2017)','const=0.2','Man et al. (2019)']
+   paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_Cycles/bs_perc_z{z}_mean-2.25_sigma*_all*.csv'))
+   keys=['Georgakakis et al. (2017)','Man et al. (2019)','Schulze et al. (2015)','const=0.2']
 
-#method_legend=f"Halo to M*: {methods['halo_to_stars']}\nDuty Cycle: {methods['duty_cycle']}\nBH_mass: {methods['BH_mass_method']}\nBol corr: {methods['bol_corr']}"
+   print(paths)
+   #read DFs
+   df_dic = read_dfs(paths,keys)
 
-#markers_style=[(q[0],   (plt.rcParams['lines.markersize']*1.2)**2,   1, 'left')]+\
-#            2*[('o',   (plt.rcParams['lines.markersize']*1.2)**2,         1, 'full')]+\
-#               [(q[1], (plt.rcParams['lines.markersize']*1.2)**2,    1, 'right')]+\
-#               [(q[2],   (plt.rcParams['lines.markersize']*1.2)**2,      0.5, 'bottom')]+\
-#               [(q[3],   (plt.rcParams['lines.markersize']*1.2)**2,      0.5, 'top')]+\
-#            2*[('o',   (plt.rcParams['lines.markersize']*1.2)**2,         1, 'full')]
-q = generate_pie_markers(4)
-markers_style=[q[0]]+2*['o']+[q[1],q[2],q[3]]+1*['o']
-leg_title='Eddington ratio distribution'
-comp_subplot(axs[0,1],df_dic,leg_title=leg_title,i=i,lambda_ave=True,ncol=2)#,markers_style=markers_style
-paths = sorted(glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}*.csv'))
-df_dic = read_dfs(paths)
-#comp_plot(df_dic,filename='Talk_Edd_distr',leg_title=leg_title,i=i,ncol=2)
-##########################################################
-# bottom-left
-# Comparison of Davis slopes # but now it's R&V
-# define DF path
-paths = glob.glob(curr_dir+'/Ros_plots/Standard_R&V/bs_perc_z1.0_lambda-0.80_alpha0.10*.csv') + \
-      sorted(glob.glob(curr_dir+f'/Ros_plots/Davis_slope/bs_perc_z{z}_lambda-0.80_alpha0.10*.csv'))
-#print(paths)
+   #method_legend=f"Halo to M*: {methods['halo_to_stars']}\nEddington ratio: {methods['edd_ratio']}\nBH_mass: {methods['BH_mass_method']}\nBol corr: {methods['bol_corr']}"
+   q = generate_pie_markers(4)
+   markers_style=[q[3],q[2],q[1],q[0]]
+   leg_title=r'Duty cycle'
+   comp_subplot(axs[0,1],df_dic,leg_title=leg_title,i=i,markers_style=markers_style)
+   #comp_plot(df_dic,filename='Talk_duty_cycles',leg_title=leg_title,i=i)
+   ##########################################################
+   # bottom-left
+   paths = glob.glob(curr_dir+f'/Ros_plots/Standard_R&V/bs_perc_z{z}_mean-2.25_sigma0.3*all*.csv') + \
+         sorted(glob.glob(curr_dir+f'/Ros_plots/Scaling_rels/bs_perc_z{z}_mean-2.25_sigma0.3*all*.csv'))
+   #print(paths)
+   keys=['Reines & Volonteri (2015)', 'Davis et al. (2018)', 'Sahu et al. (2019)', 'Shankar et al. (2016)','R&V test']
+   #read DFs
+   df_dic = read_dfs(paths,keys)
 
-#keys=['Davis et al. (2018) extended',r'Slope $\beta=2.5$',r'Slope $\beta=2.0$',r'Slope $\beta=1.5$',r'Slope $\beta=1.0$']
-keys=['Reines & Volonteri (2015)',r'Slope $\beta=1.5$',r'Slope $\beta=2.0$',r'Slope $\beta=2.5$',r'Slope $\beta=3.0$']
-#read DFs
-df_dic = read_dfs(paths,keys)
+   #method_legend=f"Halo to M*: {methods['halo_to_stars']}\nEddington ratio: {methods['edd_ratio']}\nDuty Cycle: {methods['duty_cycle']}\nBol corr: {methods['bol_corr']}"
+   leg_title=r"M$_{\rm BH}$-M$_*$ scaling relation"
+   comp_subplot(axs[1,0],df_dic,leg_title=leg_title,i=i)
+   #comp_plot(df_dic,filename='Talk_scal_rels',leg_title=leg_title,i=i)
 
-#method_legend=f"Halo to M*: {methods['halo_to_stars']}\nEddington ratio: {methods['edd_ratio']}\nDuty Cycle: {methods['duty_cycle']}\nBol corr: {methods['bol_corr']}"
-leg_title=r"M$_{\rm BH}$-M$_*$ scaling relation"+"\nwith varying slope"
-comp_subplot(axs[1,0],df_dic,leg_title=leg_title,i=i)
-#comp_plot(df_dic,filename='Talk_Slopes',leg_title=leg_title,i=i)
+   ##########################################################
+   # bottom-right
+   # Comparison of Davis slopes # but now it's R&V
+   # define DF path
+   paths = glob.glob(curr_dir+f'/Ros_plots/Standard_R&V/bs_perc_z{z}_mean-2.25_sigma0.3*all*.csv') + \
+         sorted(glob.glob(curr_dir+f'/Ros_plots/Davis_slope/bs_perc_z{z}_mean-2.25_sigma0.3*all*_slope2.0.csv'))+ \
+         sorted(glob.glob(curr_dir+f'/Ros_plots/Davis_slope/bs_perc_z{z}_mean-2.25_sigma0.3*all*_slope3.0.csv'))
+   #print(paths)
 
-##########################################################
-# bottom-right
-# Duty Cycle comparison
-paths = glob.glob(curr_dir+f'/Ros_plots/Standard_R&V/bs_perc_z{z}_lambda-0.80_alpha0.10*.csv') + \
-         glob.glob(curr_dir+f'/Ros_plots/Duty_Cycles/bs_perc_z{z}_lambda-0.80_alpha0.10*.csv')
-keys=['Schulze et al. (2015)','Georgakakis et al. (2017)','const=0.2','Man et al. (2019)']
-#paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Test_dutycycle_onoff/bs_perc_z{z}_lambda0.10_alpha0.15*.csv'))
-#keys=['Georgakakis et al. (2017)','Man et al. (2019)','Schulze et al. (2015)','const=0.2']
+   #keys=['Davis et al. (2018) extended',r'Slope $\beta=2.5$',r'Slope $\beta=2.0$',r'Slope $\beta=1.5$',r'Slope $\beta=1.0$']
+   keys=['Reines & Volonteri (2015)',r'Slope $\beta=2.0$',r'Slope $\beta=3.0$']
+   #read DFs
+   df_dic = read_dfs(paths,keys)
 
-#print(paths)
-#read DFs
-df_dic = read_dfs(paths,keys)
+   #method_legend=f"Halo to M*: {methods['halo_to_stars']}\nEddington ratio: {methods['edd_ratio']}\nDuty Cycle: {methods['duty_cycle']}\nBol corr: {methods['bol_corr']}"
+   leg_title=r"M$_{\rm BH}$-M$_*$ scaling relation"+"\nwith varying slope"
+   comp_subplot(axs[1,1],df_dic,leg_title=leg_title,i=i)
+   #comp_plot(df_dic,filename='Talk_Slopes',leg_title=leg_title,i=i)
 
-#method_legend=f"Halo to M*: {methods['halo_to_stars']}\nEddington ratio: {methods['edd_ratio']}\nBH_mass: {methods['BH_mass_method']}\nBol corr: {methods['bol_corr']}"
-markers_style=[q[3],q[2],q[1],q[0]]
-leg_title=r'Duty cycle'
-comp_subplot(axs[1,1],df_dic,leg_title=leg_title,i=i,markers_style=markers_style)
-#comp_plot(df_dic,filename='Talk_duty_cycles',leg_title=leg_title,i=i)
-##########################################################
-# invisible labels for creating space:
-#axs[-1, 0].set_xlabel('.', color=(0, 0, 0, 0))
-#axs[-1, 0].set_ylabel('.', color=(0, 0, 0, 0))
-# common lables:
-fig.text(0.5, 0.07, r'$\log$ <M$_*$> (M$_\odot$)', va='center', ha='center',size='x-large')
-fig.text(0.08, 0.5, '<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)', va='center', ha='center', rotation='vertical',size='x-large')
-#plt.ylim(2.1e-6,9e2)
-plt.ylim(bottom=2e-4)
-plt.yscale('log')
-plt.savefig(curr_dir+f'/Ros_plots/fig2_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) ;
+   ##########################################################
+   # invisible labels for creating space:
+   #axs[-1, 0].set_xlabel('.', color=(0, 0, 0, 0))
+   #axs[-1, 0].set_ylabel('.', color=(0, 0, 0, 0))
+   # common lables:
+   fig.text(0.5, 0.07, r'$\log$ <M$_*$> (M$_\odot$)', va='center', ha='center',size='x-large')
+   fig.text(0.08, 0.5, '<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)', va='center', ha='center', rotation='vertical',size='x-large')
+   #plt.ylim(2e0,8e1)
+   plt.yscale('log')
+   plt.savefig(curr_dir+f'/Ros_plots/fig2_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
+   plt.close(fig);
 
-
+z=1.0
+i=reds_dic.get(z) # needed for IDL data
 #%%
 ############################
 ##### Fig 3 ######
@@ -624,13 +1011,13 @@ methods['BH_mass_method']="Reines & Volonteri (2015)"
 # left
 z = 0.45
 i=reds_dic.get(z)
-paths = glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}*.csv') 
-#paths = glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian_slope2/bs_perc_z{z}*.csv') 
+paths = glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-2.5_sigma0.3*all.csv') +\
+   glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-3.0_sigma0.3*all.csv')
 paths = sorted(paths)
-method_legend=rf"M$_{{\rm BH}}$-M$_*$: {methods['BH_mass_method']}, slope $\beta=2$"
+method_legend=rf"M$_{{\rm BH}}$-M$_*$: {methods['BH_mass_method']}"
 #print(paths)
 #read DFs
-df_dic = read_dfs(paths,sigma=sigma,mean=mean)
+df_dic = read_dfs(paths,sigma=sigma,mean=mean,lambdac=True)
 
 #leg_title=f"z = {z:.2f}"+"\n"+rf"M$_{{\rm BH}}$-M$_*$: {methods['BH_mass_method']}"
 leg_title=f"z = {z:.2f}"
@@ -640,14 +1027,14 @@ comp_subplot(axs[0],df_dic,method_legend=method_legend,m_min=3,leg_title=leg_tit
 # center
 z = 1.
 i=reds_dic.get(z)
-paths = glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-1.5_sigma0.3*.csv*') + \
-      glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-2.0_sigma0.3*.csv*')  + \
-      glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-2.5_sigma0.3*.csv*')  
+paths = glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-2.0_sigma0.3*all.csv*')  + \
+      glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-2.25_sigma0.3*all.csv*')#+ \
+      #glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-2.25_sigma0.3*.csv*')   
 #paths = glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian_slope2/bs_perc_z{z}*.csv') 
 paths = sorted(paths)
 #print(paths)
 #read DFs
-df_dic = read_dfs(paths,sigma=sigma,mean=mean)
+df_dic = read_dfs(paths,sigma=sigma,mean=mean,lambdac=True)
 
 leg_title=f"z = {z:.2f}"
 comp_subplot(axs[1],df_dic,leg_title=leg_title,m_min=2,i=i)#
@@ -657,12 +1044,13 @@ comp_subplot(axs[1],df_dic,leg_title=leg_title,m_min=2,i=i)#
 z = 2.7
 i=reds_dic.get(z)
 # # Gaussian width Edd ratio distributions comparison
-paths = glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}*.csv') 
+paths = glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-1.25_sigma0.3*all.csv*')  + \
+      glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-1.5_sigma0.3*all.csv*')
 #paths = glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian_slope2/bs_perc_z{z}*.csv') 
 paths = sorted(paths)
 #print(paths)
 #read DFs
-df_dic = read_dfs(paths,sigma=sigma,mean=mean)
+df_dic = read_dfs(paths,sigma=sigma,mean=mean,lambdac=True)
 
 leg_title=f"z = {z:.2f}"
 comp_subplot(axs[2],df_dic,leg_title=leg_title,m_min=4,i=i)
@@ -673,6 +1061,7 @@ fig.text(0.07, 0.5, '<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)', va='center', ha='c
 plt.ylim(5e-4,1.8e2)
 plt.yscale('log')
 plt.savefig(curr_dir+f'/Ros_plots/fig3.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) ;
+plt.close(fig)
 
 # go back to previous z:
 z = 1.
@@ -727,21 +1116,39 @@ params = {'legend.fontsize': 'medium',
           'legend.title_fontsize':'medium'}
 plt.rcParams.update(params)
 
+######### Gaussian
 method_legend=f'z = {z:.2f}\n'+r"M$_{\rm BH}$-M$_*$: Reines & Volonteri (2015)"
 leg_title='Eddington ratio distribution'
-zees=[1.0,2.7]
+zees=[0.45,1.0,2.7]
 # # Comparison between LX-M* relation of SF,Q,SB galaxies
 for z in zees:
    i=reds_dic.get(z)
-   paths =glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_*_sigma0.3*.csv*') 
+   paths =glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_*_sigma0.3*_all.csv*') 
    paths = sorted(paths)
    #read DFs
-   df_dic = read_dfs(paths)
+   df_dic = read_dfs(paths,lambdac=True)
    cat_list=sorted(list(df_dic.keys()))
 
    comp_plot(df_dic,method_legend,filename=f'Comparison_SF',leg_title=leg_title,i=i,SF=cat_list,m_min=3,legend_loc=(1.02,0))
    comp_plot(df_dic,method_legend,filename=f'Comparison_Q',leg_title=leg_title,i=i,Q=cat_list,m_min=3,legend_loc=(1.02,0))
    comp_plot(df_dic,method_legend,filename=f'Comparison_SB',leg_title=leg_title,i=i,SB=cat_list,m_min=3,legend_loc=(1.02,0))
+
+######### Schechter
+leg_title='Eddington ratio distribution'
+zees=[1.0,2.7]
+# # Comparison between LX-M* relation of SF,Q,SB galaxies
+for z in zees:
+   method_legend=f'z = {z:.2f}\n'+r"M$_{\rm BH}$-M$_*$: Reines & Volonteri (2015)"
+   i=reds_dic.get(z)
+   paths =glob.glob(curr_dir+f'/Ros_plots/R&V_Schechter/bs_perc_z{z}_*.csv*') 
+   paths = sorted(paths)
+   #read DFs
+   df_dic = read_dfs(paths)
+   cat_list=sorted(list(df_dic.keys()))
+
+   comp_plot(df_dic,method_legend,filename=f'Comparison_SF_Schechter',leg_title=leg_title,i=i,SF=cat_list,m_min=3,legend_loc=(1.02,0))
+   comp_plot(df_dic,method_legend,filename=f'Comparison_Q_Schechter',leg_title=leg_title,i=i,Q=cat_list,m_min=3,legend_loc=(1.02,0))
+   comp_plot(df_dic,method_legend,filename=f'Comparison_SB_Schechter',leg_title=leg_title,i=i,SB=cat_list,m_min=3,legend_loc=(1.02,0))
 
 ###################################################
 ######### Referee - Test lambda min ###############
@@ -764,15 +1171,16 @@ fig,axs = plt.subplots(2,2,figsize=[15, 10], sharex=True, sharey=True, gridspec_
 ##########################################################
 # top-left
 # Schulze 
-paths = sorted(glob.glob(curr_dir+f'/Ros_plots/R&V_Schechter/bs_perc_z{z}_alpha0.1_lambda-0.8*.csv') +\
-      glob.glob(curr_dir+f'/Ros_plots/Test_Edd_min/bs_perc_z{z}_lambda-0.80_alpha0.10*_Schulze*.csv'))
-#print(paths)
+paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Standard_R&V/bs_perc_z{z}_mean-2.25_sigma0.30*.csv') +\
+      glob.glob(curr_dir+f'/Ros_plots/Test_Edd_min/bs_perc_z{z}_mean-2.25_sigma0.30*_Schulze*.csv'))
+print(paths)
 #read DFs
 df_dic = read_dfs(paths)
 # remove common Eddington ratio distribution, which is the same for all:
 dict_keys=list(df_dic.keys())
+print(dict_keys)
 match = SequenceMatcher(None, dict_keys[0], dict_keys[1]).find_longest_match(0, len(dict_keys[0]), 0, len(dict_keys[1]))
-#print(match)
+print(match)
 match=dict_keys[1][match.a: match.a + match.size+2]
 new_keys= [a_string.replace(match, "") for a_string in dict_keys]
 new_keys[0]=r'$\log(\lambda_{min})=$-4'
@@ -789,8 +1197,8 @@ comp_subplot(axs[0,0],df_dic,leg_title=leg_title,i=i,method_legend=method_legend
 ##########################################################
 # top-right
 # # Georgakakis17
-paths = glob.glob(curr_dir+f'/Ros_plots/Duty_cycles/bs_perc_z{z}_lambda-0.80_alpha0.10*_Georgakakis*.csv') + \
-         glob.glob(curr_dir+f'/Ros_plots/Test_Edd_min/bs_perc_z{z}_lambda-0.80_alpha0.10*_Georgakakis*.csv')
+paths = glob.glob(curr_dir+f'/Ros_plots/Duty_cycles/bs_perc_z{z}_mean-2.25_sigma0.30*_Georgakakis*.csv') + \
+         glob.glob(curr_dir+f'/Ros_plots/Test_Edd_min/bs_perc_z{z}_mean-2.25_sigma0.30*_Georgakakis*.csv')
 paths = sorted(paths)
 
 #read DFs
@@ -805,8 +1213,8 @@ comp_subplot(axs[0,1],df_dic,leg_title=leg_title,i=i,markers_style=markers_style
 ##########################################################
 # bottom-left
 # Man19
-paths = glob.glob(curr_dir+f'/Ros_plots/Duty_cycles/bs_perc_z{z}_lambda-0.80_alpha0.10*_Man*.csv') + \
-      glob.glob(curr_dir+f'/Ros_plots/Test_Edd_min/bs_perc_z{z}_lambda-0.80_alpha0.10*_Man*.csv')
+paths = glob.glob(curr_dir+f'/Ros_plots/Duty_cycles/bs_perc_z{z}_mean-2.25_sigma0.30*_Man*.csv') + \
+      glob.glob(curr_dir+f'/Ros_plots/Test_Edd_min/bs_perc_z{z}_mean-2.25_sigma0.30*_Man*.csv')
 paths = sorted(paths)
 
 #read DFs
@@ -822,8 +1230,8 @@ comp_subplot(axs[1,0],df_dic,leg_title=leg_title,i=i,markers_style=markers_style
 ##########################################################
 # bottom-right
 # constant=0.2
-paths = glob.glob(curr_dir+f'/Ros_plots/Duty_cycles/bs_perc_z{z}_lambda-0.80_alpha0.10*_const0.2*.csv')+\
-      glob.glob(curr_dir+f'/Ros_plots/Test_Edd_min/bs_perc_z{z}_lambda-0.80_alpha0.10*_const0.2*.csv')
+paths = glob.glob(curr_dir+f'/Ros_plots/Duty_cycles/bs_perc_z{z}_mean-2.25_sigma0.30*_const0.2*.csv')+\
+      glob.glob(curr_dir+f'/Ros_plots/Test_Edd_min/bs_perc_z{z}_mean-2.25_sigma0.30*_const0.2*.csv')
 paths = sorted(paths)
 
 #read DFs
@@ -842,9 +1250,113 @@ comp_subplot(axs[1,1],df_dic,leg_title=leg_title,i=i,markers_style=markers_style
 # common lables:
 fig.text(0.5, 0.07, r'$\log$ <M$_*$> (M$_\odot$)', va='center', ha='center',size='x-large')
 fig.text(0.08, 0.5, '<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)', va='center', ha='center', rotation='vertical',size='x-large')
-plt.ylim(2.1e-6,9e2)
+#plt.ylim(2.1e-6,9e2)
 plt.yscale('log')
 plt.savefig(curr_dir+f'/Ros_plots/Test_lambda_min_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) ;
+plt.close(fig)
+
+
+###################################################
+######### Referee - Test lambda min ############### FLAT EDD DISTRIB
+###################################################
+# plot global properties
+plt.rcParams["axes.prop_cycle"] = get_cycle("tab10")
+params = {'legend.fontsize': 'small',
+          'legend.title_fontsize':'small'}
+plt.rcParams.update(params)
+
+z=1.0
+i=reds_dic.get(z)
+
+q = generate_pie_markers(5)
+markers_style=[q[0],q[1],q[2],q[3],q[4]]
+
+# make 4 comparison plots
+fig,axs = plt.subplots(2,2,figsize=[15, 10], sharex=True, sharey=True, gridspec_kw={'hspace': 0, 'wspace': 0})
+
+##########################################################
+# top-left
+# Schulze 
+paths = sorted(glob.glob(curr_dir+f'/Ros_plots/R&V_Schechter/bs_perc_z1.0_alpha1.5_lambda0.0_lambdac-2.050.csv') +\
+      glob.glob(curr_dir+f'/Ros_plots/Test_Edd_min_flat_Schechter/bs_perc_z{z}_lambda0.00_alpha1.50*_Schulze*.csv'))
+print(paths)
+#read DFs
+df_dic = read_dfs(paths)
+# remove common Eddington ratio distribution, which is the same for all:
+dict_keys=list(df_dic.keys())
+print(dict_keys)
+match = SequenceMatcher(None, dict_keys[0], dict_keys[1]).find_longest_match(0, len(dict_keys[0]), 0, len(dict_keys[1]))
+print(match)
+match=dict_keys[1][match.a: match.a + match.size+2]
+new_keys= [a_string.replace(match, "") for a_string in dict_keys]
+new_keys[0]=r'$\log(\lambda_{min})=$-4'
+df_dic = dict(zip(new_keys, list(df_dic.values())))
+
+q = generate_pie_markers(5)
+markers_style=[q[0],q[1],q[2],q[3],q[4]]
+
+
+method_legend="Edd ratio distr: "+match[:-2]+'\n'+r"M$_{\rm BH}$-M$_*$: Reines & Volonteri (2015)"+f"\nz={z}"
+leg_title="Schulze"
+comp_subplot(axs[0,0],df_dic,leg_title=leg_title,i=i,method_legend=method_legend)#,markers_style=markers_style
+
+##########################################################
+# top-right
+# # Georgakakis17
+paths = glob.glob(curr_dir+f'/Ros_plots/Test_Edd_min_flat_Schechter/bs_perc_z{z}_lambda0.00_alpha1.50*_Georgakakis*.csv')
+paths = sorted(paths)
+
+#read DFs
+df_dic = read_dfs(paths)
+dict_keys=list(df_dic.keys())
+new_keys= [a_string.replace(match, "") for a_string in dict_keys]
+#new_keys[0]=r'$\log(\lambda_{min})=$ -4'
+df_dic = dict(zip(new_keys, list(df_dic.values())))
+
+leg_title='Georgakakis17'
+comp_subplot(axs[0,1],df_dic,leg_title=leg_title,i=i)#,markers_style=markers_style
+##########################################################
+# bottom-left
+# Man19
+paths = glob.glob(curr_dir+f'/Ros_plots/Test_Edd_min_flat_Schechter/bs_perc_z{z}_lambda0.00_alpha1.50*_Man*.csv')
+paths = sorted(paths)
+
+#read DFs
+df_dic = read_dfs(paths)
+dict_keys=list(df_dic.keys())
+new_keys= [a_string.replace(match, "") for a_string in dict_keys]
+#new_keys[0]=r'$\log(\lambda_{min})=$ -4'
+df_dic = dict(zip(new_keys, list(df_dic.values())))
+
+leg_title=r"Man19"
+comp_subplot(axs[1,0],df_dic,leg_title=leg_title,i=i)#,markers_style=markers_style
+
+##########################################################
+# bottom-right
+# constant=0.2
+paths = glob.glob(curr_dir+f'/Ros_plots/Test_Edd_min_flat_Schechter/bs_perc_z{z}_lambda0.00_alpha1.50*_const0.2*.csv')
+paths = sorted(paths)
+
+#read DFs
+df_dic = read_dfs(paths)
+dict_keys=list(df_dic.keys())
+new_keys= [a_string.replace(match, "") for a_string in dict_keys]
+#new_keys[0]=r'$\log(\lambda_{min})=$ -4'
+df_dic = dict(zip(new_keys, list(df_dic.values())))
+
+leg_title=r'$const=0.2$'
+comp_subplot(axs[1,1],df_dic,leg_title=leg_title,i=i)#,markers_style=markers_style
+##########################################################
+# invisible labels for creating space:
+#axs[-1, 0].set_xlabel('.', color=(0, 0, 0, 0))
+#axs[-1, 0].set_ylabel('.', color=(0, 0, 0, 0))
+# common lables:
+fig.text(0.5, 0.07, r'$\log$ <M$_*$> (M$_\odot$)', va='center', ha='center',size='x-large')
+fig.text(0.08, 0.5, '<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)', va='center', ha='center', rotation='vertical',size='x-large')
+#plt.ylim(2.1e-6,9e2)
+plt.yscale('log')
+plt.savefig(curr_dir+f'/Ros_plots/Test_lambda_min_z{z}_flatEdd.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) ;
+plt.close(fig)
 
 
 #%%
@@ -857,13 +1369,13 @@ z = 1.0
 i=reds_dic.get(z)
 paths = sorted(glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_*.csv*') )
 #read DFs
-df_dic = read_dfs(paths)
+df_dic = read_dfs(paths,lambdac=True)
 cat_list=sorted(list(df_dic.keys()))
 leg_title='Eddington ratio distribution'
 
-SFR_LX(df_dic,data,leg_title, m_min = 4,filename='SFR_LX_SF',SF=cat_list)
-SFR_LX(df_dic,data,leg_title, m_min = 4,filename='SFR_LX_Q',Q=cat_list)
-SFR_LX(df_dic,data,leg_title, m_min = 4,filename='SFR_LX_SB',SB=cat_list)
+SFR_LX(df_dic,leg_title, m_min = 4,filename='SFR_LX_SF',SF=cat_list)
+SFR_LX(df_dic,leg_title, m_min = 4,filename='SFR_LX_Q',Q=cat_list)
+SFR_LX(df_dic,leg_title, m_min = 4,filename='SFR_LX_SB',SB=cat_list)
 
 #%%
 ######################################################################
@@ -881,22 +1393,17 @@ paths = glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-1.5_sigma
       glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-2.0_sigma0.3*.csv*') +\
       glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-2.25_sigma0.3*.csv*') +\
       glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-2.5_sigma0.3*.csv*') +\
-      glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-3.0_sigma0.3*.csv*') 
-#paths = glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian_slope2/bs_perc_z{z}_mean-1.5_sigma0.3*.csv*') +\
-#      glob.glob(curr_dir+f'/Ros_plots/Test_R&V_Gaussian_slope2_norm/bs_perc_z{z}_mean-1.50_sigma0.3*norm6.75.csv*') +\
-#      glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian_slope2/bs_perc_z{z}_mean-1.75_sigma0.3*.csv*') +\
-#      glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian_slope2/bs_perc_z{z}_mean-2.0_sigma0.3*.csv*') +\
-#      glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian_slope2/bs_perc_z{z}_mean-2.25_sigma0.3*.csv*') +\
-#      glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian_slope2/bs_perc_z{z}_mean-2.5_sigma0.3*.csv*') +\
-#      glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian_slope2/bs_perc_z{z}_mean-3.0_sigma0.3*.csv*') 
+      glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-3.0_sigma0.3*.csv*') +\
+      glob.glob(curr_dir+f'/Ros_plots/Test_R&V_Gaussian_norm/bs_perc_z{z}_mean-2.25_sigma0.30*.csv*')
 #paths = sorted(paths)
-print(paths)
 #read DFs
-df_dic = read_dfs(paths,sigma=sigma,mean=mean)
-print(df_dic.keys())
-sb_list=['Gaussian $\\mu=-1.50$; norm=6.75','Gaussian $\\mu=-2.00$']
-q_list=['Gaussian $\\mu=-2.50$']
-sf_list=['Gaussian $\mu=-1.50$']
+df_dic = read_dfs(paths,sigma=sigma,mean=mean,lambdac=True)
+#print(df_dic.keys())
+sb_list=['Gaussian $\\mu=-2.00$; $\\zeta_c=-1.90$']# 'Gaussian $\\mu=-2.25$; norm=8.0; $\\zeta_c=-2.15$'
+q_list=['Gaussian $\\mu=-3.00$; $\\zeta_c=-2.90$']
+sf_list=['Gaussian $\\mu=-2.25$; $\\zeta_c=-2.15$']#'Gaussian $\\mu=-2.25$; $\\zeta_c=-2.15$'
+
+print('Gaussian $\\mu=-2.25$; norm=8.0; $\\zeta_c=-2.15$' in list(df_dic.keys()))
 
 method_legend=f"z={z}"+"\n"+r"M$_{\rm BH}$-M$_*$: Reines & Volonteri (2015)"
 comp_subplot(axs[0],df_dic,method_legend,leg_title=leg_title,i=i,Q=q_list,SB=sb_list,SF=sf_list,m_min=2,legend=False,markers_style=markers)
@@ -907,11 +1414,12 @@ axs[0].set_xlabel('<M$_*$> (M$_\odot$)')
 #print(df_dic.keys())
 leg_title='Eddington ratio distribution'
 
-SFR_LX_subplot(axs[1],df_dic,data,leg_title, m_min = 2,SB=sb_list,Q=q_list,SF=sf_list)
+SFR_LX_subplot(axs[1],df_dic,leg_title, m_min = 2,SB=sb_list,Q=q_list,SF=sf_list)
 fig.text(0.07, 0.5, '<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)', va='center', ha='center', rotation='vertical',size='x-large')
 plt.ylim(2e-2,2.5e1)
 plt.yscale('log')
 plt.savefig(curr_dir+f'/Ros_plots/fig4.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) ;
+plt.close(fig)
 
 
 #%%
@@ -921,14 +1429,13 @@ plt.savefig(curr_dir+f'/Ros_plots/fig4.pdf', format = 'pdf', bbox_inches = 'tigh
 # # Comparison between LX-M* relation of SF,Q,SB galaxies
 z = 1.0
 i=reds_dic.get(z)
-paths =glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-1.50_sigma0.3*.csv*') +\
-      glob.glob(curr_dir+f'/Ros_plots/Test_R&V_Gaussian__norm/bs_perc_z{z}_mean-1.50_sigma0.3*.csv*') 
+paths =glob.glob(curr_dir+f'/Ros_plots/R&V_Gaussian/bs_perc_z{z}_mean-2.25_sigma0.3*.csv*') +\
+      glob.glob(curr_dir+f'/Ros_plots/Test_R&V_Gaussian_norm/bs_perc_z{z}_mean-2.25_sigma0.3*.csv*') 
 paths = sorted(paths)
 #print(paths)
 #read DFs
 df_dic = read_dfs(paths)
 SB_list=list(df_dic.keys())
-#print(SB_list)
 
 #print(SB_list[0], SB_list[1])
 match = SequenceMatcher(None, SB_list[0], SB_list[1]).find_longest_match(0, len(SB_list[0]), 0, len(SB_list[1]))
@@ -960,7 +1467,7 @@ leg_title='Eddington ratio distribution'
 sb_list=['norm=7.75; Gaussian $\\mu=-1.75$, $\\sigma=0.30$']
 q_list=['norm=6.75; Gaussian $\\mu=-1.75$, $\\sigma=0.30$']
 
-SFR_LX(df_dic,data,leg_title, m_min = 4,filename='SFR_LX_SFQSB_norm',SB=sb_list,Q=q_list)
+SFR_LX(df_dic,leg_title, m_min = 4,filename='SFR_LX_SFQSB_norm',SB=sb_list,Q=q_list)
 #%%
 #####################################################
 ############ Test scatter Mh-M* ############
@@ -999,11 +1506,11 @@ i=reds_dic.get(z)
 #paths = glob.glob(curr_dir+f'/Ros_plots/Standard/bs_perc_z{z}_lambda0.10_alpha0.15*.csv') +\
 #        glob.glob(curr_dir+f'/Ros_plots/Standard/Scatter_Mbh-M*_2*/bs_perc_z{z}_lambda0.10_alpha0.15*.csv') +\
 #        glob.glob(curr_dir+f'/Ros_plots/Standard/Scatter_Mbh-M*_4*/bs_perc_z{z}_lambda0.10_alpha0.15*.csv') 
-paths = glob.glob(curr_dir+f'/Ros_plots/Standard_R&V/bs_perc_z{z}_lambda-0.80_alpha0.10*.csv') +\
-        glob.glob(curr_dir+f'/Ros_plots/Standard_R&V/Scatter_Mbh-M*_2*/bs_perc_z{z}_lambda-0.80_alpha0.10*.csv') +\
-        glob.glob(curr_dir+f'/Ros_plots/Standard_R&V/Scatter_Mbh-M*_4*/bs_perc_z{z}_lambda-0.80_alpha0.10*.csv') 
+paths = glob.glob(curr_dir+f'/Ros_plots/Standard_R&V/bs_perc_z{z}_lambda-2.35_alpha0.10*.csv') +\
+        glob.glob(curr_dir+f'/Ros_plots/Standard_R&V/Scatter_Mbh-M*_1dex/bs_perc_z{z}_lambda-2.35_alpha0.10*.csv') +\
+        glob.glob(curr_dir+f'/Ros_plots/Standard_R&V/Scatter_Mbh-M*_1.5dex/bs_perc_z{z}_lambda-2.35_alpha0.10*.csv') 
 #read DFs
-keys=['0.5 dex (default)','1.0 dex','1.5 dex']
+keys=['0.55 dex (default)','1.0 dex','1.5 dex']
 df_dic = read_dfs(paths,keys)
 
 #method_legend=f"z={z}\nBH_mass: Shankar+16"
@@ -1011,95 +1518,3 @@ method_legend=f"z={z}\nBH_mass: Reines&Volonteri15"
 leg_title='Scatter in Mbh-M* relation'
 
 comp_plot(df_dic,method_legend,filename='Comparison_Scatter_Mbh-M*',leg_title=leg_title,i=i)
-
-"""
-#%%
-#####################################################
-############ OLD ############
-#####################################################
-# Comparison of K&H slopes
-# define DF path
-paths = glob.glob(curr_dir+f'/Ros_plots/1*Kormendy*/bs_perc_z{z}.csv')
-paths = sorted(paths)
-print(paths)
-keys=[p[p.rfind('/')-10:p.rfind('/')] for p in paths]
-#read DFs
-df_dic = read_dfs(paths,keys)
-
-method_legend=f"Halo to M*: {methods['halo_to_stars']}\nEddington ratio: {methods['edd_ratio']}\nDuty Cycle: {methods['duty_cycle']}\nBol corr: {methods['bol_corr']}"
-filename='Comp_K&H_slopes'
-leg_title='Kormendy & Ho slopes'
-comp_plot(df_dic,method_legend,filename,leg_title=leg_title)
-
-#%%
-# Comparison of BH_mass_method: K&H, shankar, Eq4
-# define DF path
-paths = glob.glob(curr_dir+f'/Ros_plots/17*/bs_perc_z{z}.csv') + glob.glob(curr_dir+f'/Ros_plots/14*/bs_perc_z{z}.csv') + glob.glob(curr_dir+f'/Ros_plots/03*/bs_perc_z{z}.csv')
-paths = sorted(paths)
-print(paths)
-keys=['Shankar et al. (2016)','Kormendy & Ho (2013)','Eq. 4']
-#read DFs
-df_dic = read_dfs(paths,keys)
-
-method_legend=f"Halo to M*: {methods['halo_to_stars']}\nEddington ratio: {methods['edd_ratio']}\nDuty Cycle: {methods['duty_cycle']}\nBol corr: {methods['bol_corr']}"
-filename='Comp_BH_mass_method'
-leg_title=r'M$_* - {\rm M}_{\rm BH}$ method'
-comp_plot(df_dic,method_legend,filename,leg_title=leg_title)
-
-#%%
-# halo_to_stars comparison
-paths = glob.glob(curr_dir+f'/Ros_plots/03*/bs_perc_z{z}.csv') + glob.glob(curr_dir+f'/Ros_plots/06*/bs_perc_z{z}.csv')
-paths = sorted(paths)
-print(paths)
-keys=['Gryllis et al. (2019)','Moster et al. (----)']
-#read DFs
-df_dic = read_dfs(paths,keys)
-
-method_legend=f"Eddington ratio: {methods['edd_ratio']}\nDuty Cycle: {methods['duty_cycle']}\nBH_mass: {methods['BH_mass_method']}\nBol corr: {methods['bol_corr']}"
-filename='Comp_halo_to_stars'
-leg_title=r'M$_{\rm halo}-{\rm M}_*$ method'
-comp_plot(df_dic,method_legend,filename,leg_title=leg_title)
-
-#%%
-# Duty Cycle comparison
-paths = glob.glob(curr_dir+f'/Ros_plots/03*/bs_perc_z{z}.csv') + glob.glob(curr_dir+f'/Ros_plots/*DutyCycle*/bs_perc_z{z}.csv')
-paths = sorted(paths)
-print(paths)
-keys=['Schulze et al. (2015)','const=0.18','Man et al. (2019)','Georgakakis et al. (2017)']
-#read DFs
-df_dic = read_dfs(paths,keys)
-
-method_legend=f"Halo to M*: {methods['halo_to_stars']}\nEddington ratio: {methods['edd_ratio']}\nBH_mass: {methods['BH_mass_method']}\nBol corr: {methods['bol_corr']}"
-filename='Comp_duty_cycles'
-leg_title=r'Duty cycle method'
-comp_plot(df_dic,method_legend,filename,leg_title=leg_title)
-
-#%%
-# Gaussian width Edd ratio distributions comparison
-paths = glob.glob(curr_dir+f'/Ros_plots/03*/bs_perc_z{z}.csv') + glob.glob(curr_dir+f'/Ros_plots/*Gaussian*m=0.25*/bs_perc_z{z}.csv')
-paths = sorted(paths)
-print(paths)
-keys=['Schechter',r'Gaussian $\mu=0.25$, $\sigma=0.05$',r'Gaussian $\mu=0.25$, $\sigma=0.20$',r'Gaussian $\mu=0.25$, $\sigma=0.40$']
-#read DFs
-df_dic = read_dfs(paths,keys)
-
-method_legend=f"Halo to M*: {methods['halo_to_stars']}\nDuty Cycle: {methods['duty_cycle']}\nBH_mass: {methods['BH_mass_method']}\nBol corr: {methods['bol_corr']}"
-filename='Comp_Edd_gaussian_width'
-leg_title='Gaussian Eddington ratio\nwith varying width'
-comp_plot(df_dic,method_legend,filename,leg_title=leg_title)
-
-#%%
-# Gaussian mean Edd ratio distributions comparison
-paths = glob.glob(curr_dir+f'/Ros_plots/03*/bs_perc_z{z}.csv') + glob.glob(curr_dir+f'/Ros_plots/*Gaussian*s=0.2*/bs_perc_z{z}.csv')
-paths = sorted(paths)
-print(paths)
-keys=['Schechter',r'Gaussian $\mu=0.05$, $\sigma=0.20$',r'Gaussian $\mu=0.25$, $\sigma=0.20$',r'Gaussian $\mu=0.60$, $\sigma=0.20$']
-#read DFs
-df_dic = read_dfs(paths,keys)
-
-method_legend=f"Halo to M*: {methods['halo_to_stars']}\nDuty Cycle: {methods['duty_cycle']}\nBH_mass: {methods['BH_mass_method']}\nBol corr: {methods['bol_corr']}"
-filename='Comp_Edd_gaussian_mean'
-leg_title='Gaussian Eddington ratio\nwith varying mean'
-comp_plot(df_dic,method_legend,filename,leg_title=leg_title)
-
-"""
