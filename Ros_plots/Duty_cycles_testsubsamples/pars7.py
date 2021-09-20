@@ -1,10 +1,10 @@
-# set pars for z=1, Reines&Volonteri15, testing duty cycle: constant =0.2
+# set pars for z=0.45, Reines&Volonteri15, testing duty cycle: constant =0.2
 
 import numpy as np
 
 ################################
 # set simulation parameters
-z = 1.0
+z = 0.45
 reds_dic={0.45:0, 1:1, 1.7:2, 2.7:3}
 index=reds_dic.get(z) # needed for IDL data
 
@@ -33,7 +33,7 @@ parameters = [-1.0,-0.5,0.,0.5,1.0]
 ################################
 # Edd ratio parameters definition:
 sigma_z=0.3
-mu_z=-1.5
+mu_z=-2.0
 
 if methods['edd_ratio']=='Gaussian':
    lambda_z=sigma_z
@@ -65,4 +65,9 @@ print(M_inf,M_sup)
 
 ################################
 # filename suffix
-suffix='_const0.2'
+suffix=f"_const{methods['duty_cycle']}"
+
+
+weighted_luminosity=False
+sf_subsamples=True
+AGN_extraction=True

@@ -1,4 +1,4 @@
-# set pars for z=1, Reines&Volonteri15, testing duty cycle: Man cycle
+# set pars for z=0.45, Reines&Volonteri15, testing duty cycle: Man cycle
 
 import numpy as np
 
@@ -33,7 +33,7 @@ parameters = [-1.0,-0.5,0.,0.5,1.0]
 ################################
 # Edd ratio parameters definition:
 sigma_z=0.3
-mu_z=-2.25
+mu_z=-2.0
 
 if methods['edd_ratio']=='Gaussian':
    lambda_z=sigma_z

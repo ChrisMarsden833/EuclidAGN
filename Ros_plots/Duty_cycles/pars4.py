@@ -20,7 +20,7 @@ methods={'halo_to_stars':'Grylls19', # 'Grylls19' or 'Moster'
 ################################
 # Edd ratio parameters definition:
 sigma_z=0.3
-mu_z=-2.25
+mu_z=-1.5
 
 if methods['edd_ratio']=='Gaussian':
    lambda_z=sigma_z

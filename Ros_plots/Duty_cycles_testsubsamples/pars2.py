@@ -1,4 +1,4 @@
-# set pars for z=1, Reines&Volonteri15, testing duty cycle: constant =0.2
+# set pars for z=1, Reines&Volonteri15, testing duty cycle: Georgakakis+17
 
 import numpy as np
 
@@ -11,7 +11,7 @@ index=reds_dic.get(z) # needed for IDL data
 methods={'halo_to_stars':'Grylls19', # 'Grylls19' or 'Moster'
     'BH_mass_method':"Reines&Volonteri15", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
     'BH_mass_scatter':"Intrinsic", # "Intrinsic" or float
-    'duty_cycle':0.2, # "Schulze", "Man16", "Geo" or float (0.2)
+    'duty_cycle':"Geo", # "Schulze", "Man16", "Geo" or float (0.2)
     'edd_ratio':"Gaussian", # "Schechter", "PowerLaw", "Gaussian", "Geo"
     'bol_corr':'Lusso12_modif', # 'Duras20', 'Marconi04', 'Lusso12_modif'
     'SFR':'Carraro20' # 'Tomczak16', "Schreiber15", "Carraro20"
@@ -65,4 +65,9 @@ print(M_inf,M_sup)
 
 ################################
 # filename suffix
-suffix='_const0.2'
+suffix='_Georgakakis17'
+
+
+weighted_luminosity=False
+sf_subsamples=True
+AGN_extraction=True

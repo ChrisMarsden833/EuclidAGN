@@ -1,4 +1,4 @@
-# set pars for z=1, Reines&Volonteri15, Schechter alpha_z=0.1, lambda_z=-2.35
+# set pars for z=0.45, Reines&Volonteri15, Schechter alpha_z=0.1, lambda_z=-2.35
 
 import numpy as np
 
@@ -20,7 +20,7 @@ methods={'halo_to_stars':'Grylls19', # 'Grylls19' or 'Moster'
 ################################
 # Edd ratio parameters definition:
 sigma_z=0.3
-mu_z=-2.25
+mu_z=-2.0
 
 if methods['edd_ratio']=='Gaussian':
    lambda_z=sigma_z

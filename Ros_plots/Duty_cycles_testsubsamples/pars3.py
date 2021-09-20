@@ -1,4 +1,4 @@
-# set pars for z=1, Reines&Volonteri15, Schechter alpha_z=0.1, lambda_z=-2.35
+# set pars for z=1, Reines&Volonteri15, testing duty cycle: constant =0.2
 
 import numpy as np
 
@@ -11,23 +11,39 @@ index=reds_dic.get(z) # needed for IDL data
 methods={'halo_to_stars':'Grylls19', # 'Grylls19' or 'Moster'
     'BH_mass_method':"Reines&Volonteri15", #"Shankar16", "KormendyHo", "Eq4", "Davis18", "Sahu19" and "Reines&Volonteri15"
     'BH_mass_scatter':"Intrinsic", # "Intrinsic" or float
-    'duty_cycle':"Schulze", # "Schulze", "Man16", "Geo" or float (0.18)
+    'duty_cycle':0.2, # "Schulze", "Man16", "Geo" or float (0.2)
     'edd_ratio':"Gaussian", # "Schechter", "PowerLaw", "Gaussian", "Geo"
     'bol_corr':'Lusso12_modif', # 'Duras20', 'Marconi04', 'Lusso12_modif'
     'SFR':'Carraro20' # 'Tomczak16', "Schreiber15", "Carraro20"
     }
 
-weighted_luminosity=False
-nh_thresh=100
+# looping on:
+if methods['edd_ratio']=="Schechter":
+   variable_name = r"$\lambda$"
+   par_str= 'lambda'
+   #variable_name = r"$\alpha$"
+   #par_str= 'alpha'
+elif methods['edd_ratio']=="Gaussian":
+   #variable_name = r"$\sigma$"
+   #par_str= 'sigma'
+   variable_name = r"$\mu$"
+   par_str= 'mean'
+parameters = [-1.0,-0.5,0.,0.5,1.0]
 
 ################################
 # Edd ratio parameters definition:
 sigma_z=0.3
-mu_z=-2.25
+mu_z=-1.5
 
 if methods['edd_ratio']=='Gaussian':
    lambda_z=sigma_z
    alpha_z=mu_z
+
+if methods['edd_ratio']=="Schechter":
+   print(f'lambda_z={lambda_z}, alpha_z={alpha_z}')
+elif methods['edd_ratio']=="Gaussian":
+   print(f'sigma={sigma_z}, mu_z={mu_z}')
+
 
 ################################
 # mass range restrictions
@@ -49,4 +65,9 @@ print(M_inf,M_sup)
 
 ################################
 # filename suffix
-suffix='_Schulze'
+suffix='_const0.2'
+
+
+weighted_luminosity=False
+sf_subsamples=True
+AGN_extraction=True
