@@ -71,3 +71,7 @@ suffix='_const0.2'
 weighted_luminosity=False
 sf_subsamples=True
 AGN_extraction=True
+
+weighted_luminosity=False
+sf_subsamples=True
+AGN_extraction=True
