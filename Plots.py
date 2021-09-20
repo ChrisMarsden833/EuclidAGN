@@ -175,7 +175,7 @@ def convert_index_to_float(index):
    return new_index
 
 # read files as dataframes
-def read_dfs(paths,keys=None,sigma=True,mean=True,lambdac=False):
+def read_dfs(paths,keys=None,sigma=True,mean=True,lambdac=False,duty=False):
     #read and place in dictionary
     if keys:
       dictionary={}
@@ -213,6 +213,15 @@ def read_dfs(paths,keys=None,sigma=True,mean=True,lambdac=False):
             #df_dict[fr"Gaussian $\mu={pars['mean']}$"]=df
          else:
             new_key+=fr"Schechter $x*={float(pars['lambda']):.2f}$, $\alpha={float(pars['alpha']):.2f}$"
+         
+         if duty:
+            if 'const' in pars.keys():
+               new_key+=f"; const={float(pars['const']):.2f}"
+            else:
+               duties={'Geo':'Georgakakis et al. (2017)','Man':'Man et al. (2019)','Schulze':'Schulze et al. (2015)'}
+               for d in duties.keys():
+                  if d in p:
+                     new_key+=f"; {duties[d]}"
 
          if (lambdac==True) and ('lambdac' in pars.keys()):
                new_key+=fr"; $\zeta_c={np.asarray(pars['lambdac'], dtype=np.float64):.2f}$"
@@ -220,8 +229,10 @@ def read_dfs(paths,keys=None,sigma=True,mean=True,lambdac=False):
          if 'lambdam' in pars.keys():
                new_key+=r"; $\log(\lambda_{min})=$"
                new_key+=f"{np.asarray(pars['lambdam'], dtype=np.float64):.0f}"
-         df_dict[new_key]=df
+         if 'scatter' in pars.keys():
+               new_key+=f"; scatter={float(pars['scatter']):.1f}"
 
+         df_dict[new_key]=df
       return df_dict
 
 #%%
@@ -649,61 +660,78 @@ for z in zees:
 ####################################
 ### Duty cycle effects on active ###
 ####################################
-z = 1.
+z = 0.45
 i=reds_dic.get(z) # needed for IDL data
 # make 4 comparison plots
-fig,axs = plt.subplots(2,2,figsize=[15, 10], sharex=True, sharey=True, gridspec_kw={'hspace': 0, 'wspace': 0})
+fig,axs = plt.subplots(3,2,figsize=[15, 15], sharex=True, sharey=True, gridspec_kw={'hspace': 0, 'wspace': 0})
 
 ##########################################################
 # top-left   
-# simple mean, active no NH cut
-paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles_testmean_noNH/bs_perc_z{z}_mean-2.25_sigma0.3*_active*.csv'))
+paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles/bs_perc_z{z}_mean-2.00_sigma0.3*_active*const*.csv'))
 #print(paths)
 #read DFs
-keys=['Georgakakis et al. (2017)','Man et al. (2019)','Schulze et al. (2015)','const=0.2']
-df_dic = read_dfs(paths,keys,lambdac=True)
+df_dic = read_dfs(paths,duty=True,mean=False,sigma=False)
 
 method_legend=f"Active (logLX>42), simple mean, no NH cut"
-#q = generate_pie_markers(2)
-#markers_style=1*['o']+[q[0]]+[q[1]]+1*['o']
+q = generate_pie_markers(5)
+markers_style=[q[1],q[2],q[0],q[3],q[4]]*4
 leg_title=r'Duty cycle'
-comp_subplot(axs[0,0],df_dic,leg_title=leg_title,i=i,method_legend=method_legend,active=True)#,markers_style=markers_style
+comp_subplot(axs[0,0],df_dic,leg_title=leg_title,i=i,active=True,markers_style=markers_style,m_min=3,legend_loc='upper left')#,method_legend=method_legend
 ##########################################################
-# top-right
-# simple mean, active no NH cut
-paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles_testmean/bs_perc_z{z}_mean-2.25_sigma0.3*_active*.csv'))
+# top-right   
+paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles_testscatter/bs_perc_z{z}_mean-2.00_sigma0.3*_active*const*scatter0.8.csv'))
+#print(paths)
+#read DFs
+df_dic = read_dfs(paths,duty=True,mean=False,sigma=False)
+
+method_legend=f"Active (logLX>42), simple mean, no NH cut"
+leg_title=r'Duty cycle'
+comp_subplot(axs[0,1],df_dic,leg_title=leg_title,i=i,active=True,markers_style=markers_style,m_min=3,legend_loc='upper left')#,method_legend=method_legend
+##########################################################
+# mid-left   
+paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles_testscatter/bs_perc_z{z}_mean-2.00_sigma0.3*_active*const*scatter1.0.csv'))
+#print(paths)
+#read DFs
+df_dic = read_dfs(paths,duty=True,mean=False,sigma=False)
+
+method_legend=f"Active (logLX>42), simple mean, no NH cut"
+leg_title=r'Duty cycle'
+comp_subplot(axs[1,0],df_dic,leg_title=leg_title,i=i,active=True,markers_style=markers_style,m_min=3,legend_loc='upper left')#,method_legend=method_legend
+##########################################################
+# mid-right
+paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles/bs_perc_z{z}_mean-2.00_sigma0.3*_active*Man*.csv'))
+paths += sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles_testscatter/bs_perc_z{z}_mean-2.00_sigma0.3*_active*Man19*.csv'))
 
 #print(paths)
 #read DFs
-df_dic = read_dfs(paths,keys)
+df_dic = read_dfs(paths,duty=True,mean=False,sigma=False)
 
 method_legend=f"Active (logLX>42), simple mean, NH cut"
-#q = generate_pie_markers(4)
-#markers_style=[q[3],q[2],q[1],q[0]]
 leg_title=r'Duty cycle'
-comp_subplot(axs[0,1],df_dic,leg_title=leg_title,i=i,legend=False,active=True,method_legend=method_legend)#,markers_style=markers_style
+comp_subplot(axs[1,1],df_dic,leg_title=leg_title,i=i,active=True,m_min=3,legend_loc='upper left')#,markers_style=markers_style)#,method_legend=method_legend
 ##########################################################
 # bottom-left
-paths =sorted( glob.glob(curr_dir+f'/Ros_plots/Duty_cycles_noNH/bs_perc_z{z}_*_active*.csv'))
+paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles/bs_perc_z{z}_mean-2.00_sigma0.3*_active*Geo*.csv'))
+paths += sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles_testscatter/bs_perc_z{z}_mean-2.00_sigma0.3*_active*Geo*.csv'))
 #print(paths)
 #read DFs
-df_dic = read_dfs(paths,keys)
+df_dic = read_dfs(paths,duty=True,mean=False,sigma=False)
 
-method_legend=f"Active (logLX>42), weighted mean, no NH cut"
+#method_legend=f"Active (logLX>42), weighted mean, no NH cut"
 leg_title=r"M$_{\rm BH}$-M$_*$ scaling relation"
-comp_subplot(axs[1,0],df_dic,leg_title=leg_title,i=i,legend=False,active=True,method_legend=method_legend)
+comp_subplot(axs[2,0],df_dic,leg_title=leg_title,i=i,active=True,m_min=3,legend_loc='upper left')#,method_legend=method_legend
 
 ##########################################################
 # bottom-right
-# Comparison of Davis slopes # but now it's R&V
-paths = sorted(glob.glob(curr_dir+'/Ros_plots/Duty_cycles/bs_perc_z1.0_*_active*.csv') )
+paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles/bs_perc_z{z}_mean-2.00_sigma0.3*_active*Schulze*.csv'))
+paths += sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles_testscatter/bs_perc_z{z}_mean-2.00_sigma0.3*_active*Schulze*.csv'))
 #print(paths)
 
 #read DFs
-df_dic = read_dfs(paths,keys)
+df_dic = read_dfs(paths,duty=True,mean=False,sigma=False)
 
-method_legend=f"Active (logLX>42), weighted mean, NH cut"
-comp_subplot(axs[1,1],df_dic,leg_title=leg_title,i=i,legend=False,active=True,method_legend=method_legend)
+#method_legend=f"Active (logLX>42), weighted mean, NH cut"
+comp_subplot(axs[2,1],df_dic,leg_title=leg_title,i=i,active=True,m_min=3,legend_loc='upper left')#,method_legend=method_legend
 
 ##########################################################
 # common lables:
@@ -711,7 +739,7 @@ fig.text(0.5, 0.07, r'$\log$ <M$_*$> (M$_\odot$)', va='center', ha='center',size
 fig.text(0.08, 0.5, '<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)', va='center', ha='center', rotation='vertical',size='x-large')
 #plt.ylim(2e0,8e1)
 plt.yscale('log')
-plt.savefig(curr_dir+f'/Ros_plots/duty_cycle_effects_active_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
+plt.savefig(curr_dir+f'/Ros_plots/scatter_effects_active_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
 plt.close(fig);
 
 #%%
@@ -932,6 +960,42 @@ for z in reds:
 
 z=1.0
 i=reds_dic.get(z) # needed for IDL data
+#%%
+####################################################
+##### Test of the mean on AGN-SF subsamples ######
+####################################################
+z = 0.45
+i=reds_dic.get(z)
+fig,axs = plt.subplots(1,2,figsize=[15, 5], sharey=True, gridspec_kw={'hspace': 0, 'wspace': 0})#, sharex=True
+sigma=False # don't show the standard deviation of the gaussian in the legend of the plots
+mean=False
+##########################################################
+# left plot:
+paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles/bs_perc_z{z}_mean-2.00_sigma0.3*_active*.csv'))
+#print('###########################')
+#print(paths)
+#read DFs
+df_dic = read_dfs(paths,sigma=sigma,mean=mean,duty=True)
+
+leg_title=f"Duty cycles with Eq.2 (weighted luminosity)"
+comp_subplot(axs[0],df_dic,leg_title=leg_title,m_min=3,i=i,active=True,legend_loc='upper left')#
+
+##########################################################
+# right plot:
+# find a zeta_c that represents each mass
+paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles_testsubsamples/bs_perc_z{z}_mean-2.00_sigma0.3*_active*.csv'))
+df_dic = read_dfs(paths,sigma=sigma,mean=mean,duty=True)
+
+leg_title=f"Duty cycles with Eq.3 (mean luminosity) on random subsamples"
+comp_subplot(axs[1],df_dic,leg_title=leg_title,m_min=3,i=i,active=True,legend_loc='upper left')#
+##########################################################
+# common lables:
+fig.text(0.5, 0.04, r'$\log$ <M$_*$> (M$_\odot$)', va='center', ha='center',size='x-large')
+fig.text(0.07, 0.5, '<L$_X$> (2-10 keV) / $10^{42}$ (erg/s)', va='center', ha='center', rotation='vertical',size='x-large')
+#plt.ylim(5e-4,1.8e2)
+plt.yscale('log')
+plt.savefig(curr_dir+f'/Ros_plots/test_mean_subsamples.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) ;
+plt.close(fig)
 #%%
 ############################
 ##### Fig 3 ######
