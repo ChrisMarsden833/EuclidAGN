@@ -23,16 +23,20 @@ def is_active(duty_cycle):
    result[tosses <= duty_cycle] = 1.
    return result
 
-def sf_type(size=50,i=0,mbin=0):
+def sf_type(i=0,mlist=0):
    npzfile = np.load('./IDL_data/type_fractions.npz')
    frac_SF=npzfile['frac_SF']
    frac_Q=npzfile['frac_Q']
    frac_SB=npzfile['frac_SB']
    types_list=['SF', 'Q', 'SB']
-   data = np.random.choice(  
-        a=types_list,  
-        size=size,  
-        p=[frac_SF[i,mbin], frac_Q[i,mbin], frac_SB[i,mbin]])
+   # data = np.random.choice(  
+   #      a=types_list,  
+   #      size=size,  
+   #      p=[frac_SF[i,mbin], frac_Q[i,mbin], frac_SB[i,mbin]])
+   probs=[[frac_SF[i][mbin], frac_Q[i][mbin], frac_SB[i][mbin]] if mbin is not np.nan else [1,0,0] for mbin in mlist]
+   data=[np.random.choice(  
+        a=types_list, 
+        p=p) for p in probs]
    return data
 
 def weighted_quantile(values, sample_weight=None, quantiles=0.5, 
