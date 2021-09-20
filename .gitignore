@@ -9,6 +9,7 @@ params
 settings.json
 *.csv
 l_bol.npy
+weight_factors.npz
 *test.txt
 *.insyncdl
 *.bak
