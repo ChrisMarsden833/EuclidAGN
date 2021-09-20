@@ -46,6 +46,8 @@ norm=None # to be used with R&V
 suffix=''
 weighted_luminosity=True
 #nh_thresh=24
+sf_subsamples=False
+AGN_extraction=False
 
 ################################
 # import simulation parameters
@@ -64,20 +66,18 @@ sub_dir='Test_R&V_Gaussian_norm/' # up to pars11
 sub_dir= 'Test_Edd_min/' # up to pars16
 sub_dir= 'Test_Edd_min_flat_Schechter/' # up to pars16
 sub_dir= 'Duty_cycles_testmean/'
-sub_dir= 'Duty_cycles_testmean_noNH/'
-sub_dir= 'Standard_R&V_testmean_noNH/'
 sub_dir= 'Standard_R&V_testmean/'
-sub_dir= 'Duty_cycles_NH23/'
 sub_dir= 'Standard_R&V/'
-sub_dir= 'Duty_cycles_noNH/'
 sub_dir= 'Duty_cycles_NH23/'
 sub_dir= 'Scaling_rels/'
-sub_dir= 'Duty_cycles/'
 sub_dir= 'Davis_slope/'
+sub_dir= 'Duty_cycles_testsubsamples/'
+sub_dir= 'Duty_cycles_testscatter/'
+sub_dir= 'Duty_cycles/'
 sys.path.append(curr_dir+'/Ros_plots/'+sub_dir)
 print('subdir',sub_dir)
 
-from pars6 import *
+from pars12 import *
 
 if methods['edd_ratio']=='Gaussian':
    lambda_z=sigma_z
@@ -251,12 +251,23 @@ elif methods['edd_ratio']=="Gaussian":
 
 #gals['nh'] = agn.luminosity_to_nh(gals.luminosity, z,parallel=False)
 #gals['agn_type'] = agn.nh_to_type(gals.nh)
+if sf_subsamples:
+   gals["mass_bin"] = pd.cut(gals.stellar_mass, np.append(np.arange(10, 11.5, 0.5),12.), labels=[0,1,2])
+   gals['sf_type'] = sf_type(i=index,mlist=gals.mass_bin.values)
+   print(gals.sf_type.value_counts())
 
-gals['SFR'] = agn.SFR(z,gals.stellar_mass,methods['SFR'])
-gals['lx/SFR'] = (gals.luminosity-42)-gals.SFR
+   gals.loc[gals.sf_type == 'SF','SFR'] = agn.SFR(z,gals.loc[gals.sf_type == 'SF','stellar_mass'],methods['SFR'])
+   #gals['lx/SFR'] = (gals.luminosity-42)-gals.SFR
 
-gals['SFR_Q'] = agn.SFR_Q(z,gals.stellar_mass)
-gals['SFR_SB'] = agn.SFR_SB(z,gals.stellar_mass)
+   gals.loc[gals.sf_type == 'Q','SFR'] = agn.SFR_Q(z,gals.loc[gals.sf_type == 'Q','stellar_mass'])
+   gals.loc[gals.sf_type == 'SB','SFR'] = agn.SFR_SB(z,gals.loc[gals.sf_type == 'SB','stellar_mass'])
+
+else:
+   gals['SFR'] = agn.SFR(z,gals.stellar_mass,methods['SFR'])
+   #gals['lx/SFR'] = (gals.luminosity-42)-gals.SFR
+
+   gals['SFR_Q'] = agn.SFR_Q(z,gals.stellar_mass)
+   gals['SFR_SB'] = agn.SFR_SB(z,gals.stellar_mass)
 
 ################################
 # grouping in mass bins - log units
@@ -267,17 +278,22 @@ gals_lin=pd.DataFrame()
 gals_lin['stellar_mass'] = gals['stellar_mass']
 #gals_lin['nh'] = gals['nh']
 gals_lin['duty_cycle'] = gals['duty_cycle']
-#gals_lin['is_active'] = is_active(gals_lin.duty_cycle)
+
+gals_lin['SFR']=10**(gals.SFR)
+if sf_subsamples:
+   gals_lin['sf_type']=gals['sf_type']
+else:
+   gals_lin['SFR_Q'] = 10**(gals.SFR_Q)
+   gals_lin['SFR_SB'] = 10**(gals.SFR_SB)
+if AGN_extraction:
+   gals_lin['is_active'] = is_active(gals_lin.duty_cycle)
+
 gals_lin['luminosity']= 10**(gals.luminosity-42)
 gals_lin['weighted_luminosity']= gals_lin['luminosity']*gals['duty_cycle']
 #gals_lin['luminosity2']= gals_lin['luminosity']*gals_lin.is_active
 #gals_lin['luminosity2'].loc[gals_lin['luminosity2']==0]=1e-6
-gals_lin[['SFR','lx/SFR']]=10**gals[['SFR','lx/SFR']]
-gals_lin['SFR_Q'] = 10**(gals.SFR_Q)
-gals_lin['SFR_SB'] = 10**(gals.SFR_SB)
 gals_lin['black_hole_mass'] = gals['black_hole_mass']
 gals_lin['edd_ratio'] = gals['edd_ratio']
-#print(gals_lin[['SFR','SFR_Q','SFR_SB']])
 if gals.shape[0] != gals_lin.shape[0]:
    print('ALERT!!! something wrong in dataframes')
 
@@ -309,10 +325,16 @@ for case in cases:
       lambda_str='lambda_ave'+str
 
       # remove galaxies with lx < lx_XRB, as of Lehmer+16, from both dfs
-      gals_lin_tmp=gals_lin.copy()
+      if sf_subsamples:
+         gals_lin_tmp=gals_lin[gals_lin.sf_type == key].copy()
+         sfr_str_bis='SFR'
+      else:
+         gals_lin_tmp=gals_lin.copy()
+         sfr_str_bis=sfr_str
+
       #gals_lin['lx_bin']=10**(29.37+2.03*np.log10(1+z)+gals_lin.stellar_mass-42)+10**(39.28+1.31*np.log10(1+z)+gals[sfr_str]-42)
       #gals_lin['lx_bin']=(((10.**29.37)*((1.+z)**2.03))/10.**42.)*(10.**gals_lin.stellar_mass)+(((10.**39.28)*((1.+z)**1.31)*(10**gals[sfr_str]))/10.**42.)
-      gals_lin_tmp['lx_bin']=10**(np.log10((((10.**29.37)*((1.+z)**2.03))/10.**42.)*(10.**gals_lin.stellar_mass)+(((10.**39.28)*((1.+z)**1.31)*(10**gals[sfr_str]))/10.**42.)) + np.random.normal(0., 0.17, gals_lin.shape[0]))
+      gals_lin_tmp['lx_bin']=10**(np.log10((((10.**29.37)*((1.+z)**2.03))/10.**42.)*(10.**gals_lin_tmp.stellar_mass)+(((10.**39.28)*((1.+z)**1.31)*(gals_lin_tmp[sfr_str_bis]))/10.**42.)) + np.random.normal(0., 0.17, gals_lin_tmp.shape[0]))
       gals_lin_tmp['luminosity']=gals_lin_tmp['luminosity']+gals_lin_tmp['lx_bin']
       #α0(1 + z)γ M∗ + β0(1 + z)δSFR, (3)
       #with logα0 = 29.37, logβ0 = 39.28, γ = 2.03, and δ = 1.31.
@@ -334,6 +356,8 @@ for case in cases:
 
       if case =='active':
          gals_lin_tmp=gals_lin_tmp[gals_lin_tmp['luminosity']>Lx_lim/1e42]
+      if AGN_extraction:
+         gals_lin_tmp=gals_lin_tmp[gals_lin_tmp['is_active']==1]
       #gals_lin_tmp=gals_lin_tmp[gals_lin_tmp['nh']<nh_thresh]
 
       ################################
@@ -342,7 +366,10 @@ for case in cases:
 
       # create dataframe for bootstrapping - M_min gets rounded to the lower .5 number
       gals_highM=gals_lin_tmp.copy()#[gals_lin_tmp.stellar_mass > M_min]
-      grouped_linear = gals_highM[['stellar_mass','luminosity','SFR','SFR_Q','SFR_SB','lx/SFR','duty_cycle','edd_ratio','weighted_luminosity']].groupby(pd.cut(gals_highM.stellar_mass, np.append(np.arange(np.floor(M_min*2)/2, 11.5, 0.5),12.5)))#.quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
+      if sf_subsamples:
+         grouped_linear = gals_highM[['stellar_mass','luminosity','SFR','duty_cycle','edd_ratio','weighted_luminosity']].groupby(pd.cut(gals_highM.stellar_mass, np.append(np.arange(np.floor(M_min*2)/2, 11.5, 0.5),12.5)))#,'SFR_Q','SFR_SB'
+      else:
+         grouped_linear = gals_highM[['stellar_mass','luminosity','SFR','SFR_Q','SFR_SB','duty_cycle','edd_ratio','weighted_luminosity']].groupby(pd.cut(gals_highM.stellar_mass, np.append(np.arange(np.floor(M_min*2)/2, 11.5, 0.5),12.5)))#.quantile([0.05,0.1585,0.5,0.8415,0.95]).unstack(level=1)
       #print('Statistics for mock sample:')
       #print(gals_highM[['stellar_mass','black_hole_mass','duty_cycle']].describe(percentiles=[.01,.05,.25, .5, .75,.95,.99]))
       
@@ -444,11 +471,11 @@ for case in cases:
       # create dataframe of bootstraped linear varibles
       gals_bs=pd.DataFrame()
       func=np.median
-      grouped_df=grouped_linear[sfr_str]
+      grouped_df=grouped_linear[sfr_str_bis]
       #for key, item in grouped_df:
       #   print(item)
       #   print(grouped_df.get_group(key))
-      gals_bs[sfr_str] = grouped_linear[sfr_str].apply(lambda x: my_draw_bs_reps(x, type='median', size=500))
+      gals_bs[sfr_str] = grouped_linear[sfr_str_bis].apply(lambda x: my_draw_bs_reps(x, type='median', size=500))
       #gals_bs['unweighted_luminosity'] = grouped_linear.luminosity.apply(lambda x: dcst.draw_bs_reps(x, func, size=500)) #with median
 
       # this bit slows the code a lot
@@ -467,10 +494,10 @@ for case in cases:
       #axs[2,0].set_xlabel('Bootstrapped weighted median luminosities')
       #--------
 
-      npzfile = np.load('./IDL_data/fractions.npz')
-      factor_SF=npzfile['factor_SF']
-      factor_Q=npzfile['factor_Q']
-      factor_SB=npzfile['factor_SF']
+      # npzfile = np.load('./IDL_data/fractions.npz')
+      # factor_SF=npzfile['factor_SF']
+      # factor_Q=npzfile['factor_Q']
+      # factor_SB=npzfile['factor_SF']
 
       if case == 'all':
          if weighted_luminosity:
