@@ -9,10 +9,10 @@ N_SB=N_agn_SB+np.array([[5,2,4],[12,7,2],[11,31,7],[0,7,2]])
 N_agn_tot=N_agn_SF+N_agn_Q+N_agn_SB
 N_tot=N_SF+N_Q+N_SB
 
-np.savez('../IDL_data/type_fractions.npz',factor_SF=factor_SF,factor_Q=factor_Q,factor_SB=factor_SB)
+np.savez('IDL_data/type_fractions.npz',frac_SF=N_SF/N_tot,frac_SB=N_SB/N_tot,frac_Q=N_Q/N_tot)
 
 factor_SF=N_agn_SF/N_agn_tot*N_tot/N_SF
 factor_Q=N_agn_Q/N_agn_tot*N_tot/N_Q
 factor_SB=N_agn_SB/N_agn_tot*N_tot/N_SB
 
-np.savez('../IDL_data/weight_factors.npz',factor_SF=factor_SF,factor_Q=factor_Q,factor_SB=factor_SB)
+np.savez('IDL_data/weight_factors.npz',factor_SF=factor_SF,factor_Q=factor_Q,factor_SB=factor_SB)
