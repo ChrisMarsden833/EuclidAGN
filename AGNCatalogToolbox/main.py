@@ -288,7 +288,7 @@ def stellar_mass_to_black_hole_mass(stellar_mass, method="Shankar16", scatter="I
         else:
             print('Scatter=0.5')
             scatter = np.random.normal(0, 0.5, len(stellar_mass))
-    elif isinstance(type(scatter), float):
+    elif isinstance(scatter, float):
         scatter = np.random.normal(0., scatter, len(stellar_mass))
     elif isinstance(type(scatter), list) or isinstance(type(scatter), np.ndarray):
         scatter = np.random.normal(0, 1, len(stellar_mass)) * scatter
