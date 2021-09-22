@@ -485,12 +485,12 @@ def plot_dutycycle(df_dic,filename='measured_duty_cycles',i=0,m_str='(9.5, 10.0]
 
    ax.set_yscale('log')
    ax.set_xlabel('log$_{10}$<M$_*$> (M$_\odot$)')
-   ax.set_ylabel('output U')
+   ax.set_ylabel('AGN fraction')
    plt.savefig(curr_dir+'/Ros_plots/'+filename+f'_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
    plt.close(fig);
    return
 
-def subplot_dutycycle(df_dic,ax,i=0,m_str='(9.5, 10.0]',mstar_str='stellar_mass',m_min=2,legend_loc='lower right',method_legend=None):
+def subplot_dutycycle(df_dic,ax,i=0,m_str='(9.5, 10.0]',mstar_str='stellar_mass',m_min=3,legend_loc='lower right',method_legend=None,markers_style=None,leg_title=None):
    markers_size=(plt.rcParams['lines.markersize']*1.2)**2
    edge_width=0.5
 
@@ -499,13 +499,16 @@ def subplot_dutycycle(df_dic,ax,i=0,m_str='(9.5, 10.0]',mstar_str='stellar_mass'
 
    # mocks U
    for j,(s,df) in enumerate(df_dic.items()):
-      df.loc[m_str:].plot.scatter(x=(mstar_str,0.5),y='AGN_fraction',edgecolors='Black', label=s,color=cols[j], s=markers_size, linewidth=edge_width,ax=ax)
-      df.loc[m_str:].plot(x=(mstar_str,0.5),y='AGN_fraction', color=cols[j],ax=ax,linestyle=ls[j],alpha=0.5)
+      if markers_style:
+         df.loc[m_str:].plot.scatter(x=(mstar_str,0.5),y=('AGN_fraction','Unnamed: 16_level_1'),edgecolors='Black', label=s,color=cols[j], s=markers_size, linewidth=edge_width,ax=ax,marker=markers_style[j])
+      else:
+         df.loc[m_str:].plot.scatter(x=(mstar_str,0.5),y=('AGN_fraction','Unnamed: 16_level_1'),edgecolors='Black', label=s,color=cols[j], s=markers_size, linewidth=edge_width,ax=ax)
+      df.loc[m_str:].plot(x=(mstar_str,0.5),y=('AGN_fraction','Unnamed: 16_level_1'), color=cols[j],ax=ax,linestyle=ls[j],alpha=0.5,label='')
 
    if method_legend:
       ax.text(0.03, 0.965, method_legend, transform=ax.transAxes, **text_pars)
 
-   leg=ax.legend(loc=legend_loc,framealpha=0.4)#,title=leg_title,ncol=ncol
+   leg=ax.legend(loc=legend_loc,framealpha=0.4,title=leg_title)#,title=leg_title,ncol=ncol
    leg._legend_box.align= "left"
 
    ax.set_yscale('log')
