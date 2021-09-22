@@ -237,7 +237,7 @@ def read_dfs(paths,keys=None,sigma=True,mean=True,lambdac=False,duty=False):
 
 #%%
 # function for comparison subplots
-def comp_subplot(ax,df_dic,method_legend=None,leg_title=None,m_min=2,i=0,
+def comp_subplot(ax,df_dic,method_legend=None,leg_title=None,m_min=3,i=0,
                   SB=[],Q=[],SF=[],legend=True,legend_loc='lower right',markers_style=None,lambda_ave=False,ncol=1,active=False):
    if active:
       data=active_data
@@ -305,7 +305,7 @@ def comp_subplot(ax,df_dic,method_legend=None,leg_title=None,m_min=2,i=0,
       leg._legend_box.align= "left"
    return
 
-def subplot_sim_LX(ax,df,s,j=0,mstar_str='stellar_mass',lum_str='luminosity',markers_size=1,edge_width=1,markers_style=None,lambda_ave=False,m_str='(9.0, 9.5]'):
+def subplot_sim_LX(ax,df,s,j=0,mstar_str='stellar_mass',lum_str='luminosity',markers_size=1,edge_width=1,markers_style=None,lambda_ave=False,m_str='(9.5, 10.0]'):
    # errorbars of bootstrapped simulation points
    yerr=np.array([df.loc[m_str:,(lum_str,0.5)] - df.loc[m_str:,(lum_str,0.05)], 
                   df.loc[m_str:,(lum_str,0.95)] - df.loc[m_str:,(lum_str,0.5)]])
@@ -329,7 +329,7 @@ def subplot_sim_LX(ax,df,s,j=0,mstar_str='stellar_mass',lum_str='luminosity',mar
             texts.append(ax.text(row.loc[(mstar_str,0.5)], row.loc[(lum_str,0.5)], f"{row.loc[(lambda_ave_str,'mean')]:.2f}", size=8))
       #adjust_text(texts)
 
-def subplot_data_LX(ax,data, label, marker,m_min=2):
+def subplot_data_LX(ax,data, label, marker,m_min=3):
     ax.scatter(data['m_ave'][0,m_min:,i], data['l_ave'][0,m_min:,i], edgecolors=cols[0], marker=marker,color='None',label=label,s=(plt.rcParams['lines.markersize']*1.4)**2)
     #ax.scatter(data['m_ave'][0,m_min:,i], data['l_ave'][0,m_min:,i], edgecolors='Black', marker=marker,color=cols[0],label=label)
     ax.errorbar(data['m_ave'][0,m_min:,i], data['l_ave'][0,m_min:,i],
@@ -340,7 +340,7 @@ def subplot_data_LX(ax,data, label, marker,m_min=2):
 
 #%%
 # make 1 single comparison plot
-def comp_plot(df_dic,method_legend=None,filename='Comparisons',leg_title=None,i=0,SB=[],Q=[],SF=[],m_min=2,legend_loc='lower right',markers_style=None,lambda_ave=False,ncol=1,active=False):
+def comp_plot(df_dic,method_legend=None,filename='Comparisons',leg_title=None,i=0,SB=[],Q=[],SF=[],m_min=3,legend_loc='lower right',markers_style=None,lambda_ave=False,ncol=1,active=False):
     fig,ax = plt.subplots(figsize=[9, 6])
     #plt.rcParams["axes.prop_cycle"] = get_cycle("tab10")
 
@@ -357,7 +357,7 @@ def comp_plot(df_dic,method_legend=None,filename='Comparisons',leg_title=None,i=
 #%%
 # Plot SFR vs LX
 #def SFR_LX(df_dic,data,leg_title=None,m_min=2):
-def SFR_LX(df_dic,leg_title=None,m_min=2,filename='SFvsLX',SB=[],Q=[],SF=[],active=False):
+def SFR_LX(df_dic,leg_title=None,m_min=3,filename='SFvsLX',SB=[],Q=[],SF=[],active=False):
    fig,ax = plt.subplots(figsize=[12, 8])
    
    SFR_LX_subplot(ax,df_dic,leg_title=leg_title,m_min=m_min,SB=SB,Q=Q,SF=SF,active=active)
@@ -368,7 +368,7 @@ def SFR_LX(df_dic,leg_title=None,m_min=2,filename='SFvsLX',SB=[],Q=[],SF=[],acti
    plt.savefig(curr_dir+'/Ros_plots/'+filename+f'_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
    plt.close(fig)
 
-def SFR_LX_subplot(ax,df_dic,leg_title=None,m_min=2,SB=[],Q=[],SF=[],active=False):
+def SFR_LX_subplot(ax,df_dic,leg_title=None,m_min=3,SB=[],Q=[],SF=[],active=False):
    if active:
       data=active_data
       data_Q=active_data_Q
@@ -449,7 +449,7 @@ def SFR_LX_subplot(ax,df_dic,leg_title=None,m_min=2,SB=[],Q=[],SF=[],active=Fals
    ax.set_yscale('log')
    return
 
-def subplot_sim_SFR(ax,bs_perc,s,_min,_max,j=0,SFR_str='SFR',lum_str='luminosity',mstar_str='stellar_mass',edge_width=1,m_str='(9.0, 9.5]'):
+def subplot_sim_SFR(ax,bs_perc,s,_min,_max,j=0,SFR_str='SFR',lum_str='luminosity',mstar_str='stellar_mass',edge_width=1,m_str='(9.5, 10.0]'):
    # errorbars of bootstrapped simulation points
    xerr=np.array([bs_perc.loc[m_str:,(SFR_str,0.5)] - bs_perc.loc[m_str:,(SFR_str,0.05)], 
                bs_perc.loc[m_str:,(SFR_str,0.95)] - bs_perc.loc[m_str:,(SFR_str,0.5)]])
@@ -464,7 +464,7 @@ def subplot_sim_SFR(ax,bs_perc,s,_min,_max,j=0,SFR_str='SFR',lum_str='luminosity
                   xerr=xerr, yerr=yerr, linestyle=data_pars['linestyle'], c=data_pars['color'], zorder=0)
    return [mlines.Line2D([], [], label=s, **data_pars)]
 
-def subplot_data_SFR(ax,data, label, marker,_min,_max,m_min=2,edge_width=1):
+def subplot_data_SFR(ax,data, label, marker,_min,_max,m_min=3,edge_width=1):
    data_pars=dict(marker=marker,linestyle='-', markeredgecolor='Black', color=cols[0])
    ax.scatter(data['sfr_ave'][0,m_min:,i], data['l_ave'][0,m_min:,i], vmin = _min, vmax = _max, edgecolors=data_pars['markeredgecolor'],
                c=data['m_ave'][0,m_min:,0], s=data['m_ave'][0,m_min:,0]*10, marker=data_pars['marker'],linewidth=edge_width)
@@ -477,7 +477,7 @@ def subplot_data_SFR(ax,data, label, marker,_min,_max,m_min=2,edge_width=1):
    handle = [mlines.Line2D([], [], label=label,**data_pars)]
    return handle
 
-def plot_dutycycle(df_dic,filename='measured_duty_cycles',i=0,m_str='(9.5, 10.0]',mstar_str='stellar_mass',m_min=2,legend_loc='lower right',method_legend=None):
+def plot_dutycycle(df_dic,filename='measured_duty_cycles',i=0,m_str='(9.5, 10.0]',mstar_str='stellar_mass',m_min=3,legend_loc='lower right',method_legend=None,leg_title=None,markers_style=None):
    fig,ax = plt.subplots(figsize=[9, 6])
     #plt.rcParams["axes.prop_cycle"] = get_cycle("tab10")
 
