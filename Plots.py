@@ -134,7 +134,7 @@ cols= 50*["#1f77b4","#fda000","#e55171","#44aa99","#332288","#e6a1eb","#0b672a",
 markers = 50*["o","^","p","P","*","h","X","D","8"]
 
 # change color map
-from matplotlib.pyplot import cycler
+from matplotlib.pyplot import cycler, legend
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 import matplotlib.cm
 import re
@@ -481,7 +481,7 @@ def plot_dutycycle(df_dic,filename='measured_duty_cycles',i=0,m_str='(9.5, 10.0]
    fig,ax = plt.subplots(figsize=[9, 6])
     #plt.rcParams["axes.prop_cycle"] = get_cycle("tab10")
 
-   subplot_dutycycle(df_dic,ax=ax,i=i,m_str=m_str,mstar_str=mstar_str,m_min=m_min,legend_loc=legend_loc,method_legend=method_legend)
+   subplot_dutycycle(df_dic,ax=ax,i=i,m_str=m_str,mstar_str=mstar_str,m_min=m_min,legend_loc=legend_loc,method_legend=method_legend,leg_title=leg_title,markers_style=markers_style)
 
    ax.set_yscale('log')
    ax.set_xlabel('log$_{10}$<M$_*$> (M$_\odot$)')
@@ -571,25 +571,25 @@ for z in zees:
       plot_dutycycle(df_dic,filename=f'R&V_Schechter/duty_cycle_'+path[path.rfind('/')+1:path.rfind('.csv')-1],i=i)
 """
 #######
-z = 1.
-i=reds_dic.get(z) # needed for IDL data
-# make 4 comparison plots
-fig,axs = plt.subplots(3,1,figsize=[5, 10], sharex=True, sharey=True, gridspec_kw={'hspace': 0, 'wspace': 0})
+# AGN_fractions as a function of the different input duty cycles
+zees={0.45:'mean-2.00_sigma0.3',1.0:'mean-1.50_sigma0.3'}
+for z,string in zees.items():
+   i=reds_dic.get(z) # needed for IDL data
 
-folders=['Duty_cycles','Duty_cycles_NH23','Duty_cycles_noNH']
-strings=['Cut at $\log(N_H)=24$','Cut at $\log(N_H)=23$','No cut in $N_H$']
-for j,(f,s) in enumerate(zip(folders,strings)):
-   paths = sorted(glob.glob(curr_dir+f'/Ros_plots/{f}/bs_perc_z{z}_*_active*.csv'))
+   paths = sorted(glob.glob(curr_dir+f'/Ros_plots/Duty_cycles/bs_perc_z{z}_*{string}*_active*.csv'))
    #print(paths)
-   keys=['Georgakakis et al. (2017)','Man et al. (2019)','Schulze et al. (2015)','const=0.2']
 
-   df_dic = read_dfs(paths,keys,lambdac=True)
-   subplot_dutycycle(df_dic,axs[j],i=i,legend_loc=(1.02,0),method_legend=s)
+   df_dic = read_dfs(paths, duty=True)
+   dict_keys=list(df_dic.keys())
+   match = SequenceMatcher(None, dict_keys[0], dict_keys[1]).find_longest_match(0, len(dict_keys[0]), 0, len(dict_keys[1]))
+   match=dict_keys[1][match.a: match.a + match.size]
+   new_keys= [a_string.replace(match, "") for a_string in dict_keys]
+   df_dic = dict(zip(new_keys, list(df_dic.values())))
 
-#fig.text(0.5, 0.07, r'$\log_{10}$ <M$_*$> (M$_\odot$)', va='center', ha='center',size='x-large')
-#fig.text(0.08, 0.5, 'output U', va='center', ha='center', rotation='vertical',size='x-large')
-plt.savefig(curr_dir+'/Ros_plots/measured_duty_cycles_vsNH'+f'_z{z}.pdf', format = 'pdf', bbox_inches = 'tight',transparent=True) 
-plt.close(fig);
+   markers_style = generate_pie_markers(len(dict_keys))
+
+   leg_title='Duty cycle'
+   plot_dutycycle(df_dic,i=i,filename='AGN_fractions_vs_U',method_legend=match[:-2],leg_title=leg_title,markers_style=markers_style)#,legend_loc=(1.02,0)
 
 #######
 #######
